@@ -214,12 +214,13 @@ const server = http.createServer(async (req, res) => {
       }
       const token = randomToken(48);
       const csrf = randomToken(32);
-      sessions.set(token, {
+      sessions.set(sessionKey(token), {
         username: adminUser,
         role: "founder",
         csrf,
         expiresAt: Date.now() + 8 * 60 * 60 * 1000
       });
+      await persistSessions();
       await audit(req, "auth.login", "success");
       return json(res, 200, {
         ok: true,
@@ -237,7 +238,8 @@ const server = http.createServer(async (req, res) => {
         await audit(req, "auth.logout", "csrf_denied");
         return json(res, 403, { error: "csrf_denied" });
       }
-      sessions.delete(session.token);
+      sessions.delete(sessionKey(session.token));
+      await persistSessions();
       await audit(req, "auth.logout", "success");
       return json(res, 200, { ok: true }, { "set-cookie": cookie("soularab_admin", "", 0) });
     }
