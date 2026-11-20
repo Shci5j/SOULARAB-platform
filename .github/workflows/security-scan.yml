@@ -1,0 +1,44 @@
+name: security-scan
+
+on:
+  push:
+    branches: ["main", "phase3-operations-hardening"]
+  pull_request:
+  schedule:
+    - cron: "17 3 * * 1"
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  dependency-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - name: Generate lockfile for audit
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Audit dependencies
+        run: npm audit --audit-level=high
+
+  container-scan:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service: [public, admin]
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build image
+        run: docker build -f apps/${{ matrix.service }}/Dockerfile -t soularab/${{ matrix.service }}:scan .
+      - name: Scan image
+        uses: aquasecurity/trivy-action@0.33.1
+        with:
+          image-ref: soularab/${{ matrix.service }}:scan
+          format: table
+          exit-code: "1"
+          ignore-unfixed: true
+          severity: CRITICAL,HIGH
