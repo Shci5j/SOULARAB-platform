@@ -11,6 +11,7 @@ coverage/
 .env
 .env.*
 !.env.example
+!.env.compose.example
 
 # Local tooling
 .DS_Store
@@ -18,4 +19,4 @@ coverage/
 
 # Local activation/session state
 .data/
-*.tmp\n
+*.tmp
