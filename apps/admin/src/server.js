@@ -1,6 +1,7 @@
 import http from "node:http";
 import crypto from "node:crypto";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import {
   randomToken,
   requireEnv,
@@ -17,14 +18,60 @@ const sessionSecret = requireStrongSecret("ADMIN_SESSION_SECRET");
 const serviceToken = requireStrongSecret("SERVICE_CONTROL_TOKEN");
 const publicApiUrl = process.env.PUBLIC_API_URL || "http://127.0.0.1:4000";
 const allowedOrigin = process.env.ADMIN_ALLOWED_ORIGIN || "";
+const sessionStorePath = resolve(process.env.SESSION_STORE_FILE || "./.data/sessions.json");
 const requestTimeoutMs = Number(process.env.REQUEST_TIMEOUT_MS || 10_000);
 if (!Number.isSafeInteger(requestTimeoutMs) || requestTimeoutMs < 1_000) {
   throw new Error("REQUEST_TIMEOUT_MS must be an integer of at least 1000");
 }
 const sessions = new Map();
 const attempts = new Map();
+let sessionWriteQueue = Promise.resolve();
 
 await mkdir("./.data", { recursive: true });
+
+function sessionKey(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+async function loadSessionStore() {
+  try {
+    const parsed = JSON.parse(await readFile(sessionStorePath, "utf8"));
+    if (parsed?.version !== 1 || !Array.isArray(parsed.sessions)) {
+      throw new Error("session store has an unsupported format");
+    }
+    for (const entry of parsed.sessions) {
+      if (!Array.isArray(entry) || entry.length !== 2 ||
+          !/^[a-f0-9]{64}$/.test(entry[0]) ||
+          typeof entry[1]?.username !== "string" ||
+          typeof entry[1]?.csrf !== "string" ||
+          !Number.isFinite(entry[1]?.expiresAt) ||
+          entry[1]?.role !== "founder") {
+        throw new Error("session store contains an invalid entry");
+      }
+      sessions.set(entry[0], entry[1]);
+    }
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+}
+
+async function persistSessions() {
+  const task = sessionWriteQueue.then(async () => {
+    await mkdir(dirname(sessionStorePath), { recursive: true });
+    const temporaryPath = sessionStorePath + "." + crypto.randomUUID() + ".tmp";
+    const data = { version: 1, sessions: [...sessions.entries()] };
+    await writeFile(temporaryPath, JSON.stringify(data, null, 2) + "\n", {
+      encoding: "utf8",
+      mode: 0o600,
+      flag: "wx"
+    });
+    await rename(temporaryPath, sessionStorePath);
+  });
+  sessionWriteQueue = task.catch(() => {});
+  return task;
+}
+
+await loadSessionStore();
 
 function json(res, status, body, headers = {}) {
   securityHeaders(res);
@@ -92,21 +139,24 @@ function rateLimited(req) {
   return false;
 }
 
-function sessionFrom(req) {
+async function sessionFrom(req) {
   const raw = parseCookies(req.headers.cookie).soularab_admin;
   if (!raw) return null;
   const [token, signature] = raw.split(".");
   if (!token || !signature || !timingSafeEqualText(signature, signSession(token))) return null;
-  const session = sessions.get(token);
-  if (!session || session.expiresAt < Date.now()) {
-    sessions.delete(token);
+  const key = sessionKey(token);
+  const session = sessions.get(key);
+  if (!session) return null;
+  if (session.expiresAt < Date.now()) {
+    sessions.delete(key);
+    await persistSessions();
     return null;
   }
   return { token, ...session };
 }
 
-function requireFounder(req, res) {
-  const session = sessionFrom(req);
+async function requireFounder(req, res) {
+  const session = await sessionFrom(req);
   if (!session || session.role !== "founder") {
     json(res, 401, { error: "authentication_required" });
     return null;
@@ -114,9 +164,10 @@ function requireFounder(req, res) {
   return session;
 }
 
-async function audit(req, action, result, metadata = {}) {
+async function audit(req, action, result, metadata = {}, actorOverride = null) {
+  const session = actorOverride ? null : await sessionFrom(req);
   return writeAuditEvent({
-    actor: sessionFrom(req)?.username || "anonymous",
+    actor: actorOverride || session?.username || "anonymous",
     action,
     target: "admin-control-plane",
     result,
@@ -163,12 +214,19 @@ const server = http.createServer(async (req, res) => {
       }
       const token = randomToken(48);
       const csrf = randomToken(32);
-      sessions.set(token, {
+      const sessionRecord = {
         username: adminUser,
         role: "founder",
         csrf,
         expiresAt: Date.now() + 8 * 60 * 60 * 1000
-      });
+      };
+      sessions.set(sessionKey(token), sessionRecord);
+      try {
+        await persistSessions();
+      } catch (error) {
+        sessions.delete(sessionKey(token));
+        throw error;
+      }
       await audit(req, "auth.login", "success");
       return json(res, 200, {
         ok: true,
@@ -180,25 +238,38 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "POST" && req.url === "/api/auth/logout") {
-      const session = requireFounder(req, res);
+      const session = await requireFounder(req, res);
       if (!session) return;
       if (req.headers["x-csrf-token"] !== session.csrf) {
         await audit(req, "auth.logout", "csrf_denied");
         return json(res, 403, { error: "csrf_denied" });
       }
-      sessions.delete(session.token);
-      await audit(req, "auth.logout", "success");
+      const key = sessionKey(session.token);
+      sessions.delete(key);
+      try {
+        await persistSessions();
+      } catch (error) {
+        sessions.set(key, {
+          username: session.username,
+          role: session.role,
+          csrf: session.csrf,
+          expiresAt: session.expiresAt
+        });
+        await audit(req, "auth.logout", "storage_error", {}, session.username);
+        throw error;
+      }
+      await audit(req, "auth.logout", "success", {}, session.username);
       return json(res, 200, { ok: true }, { "set-cookie": cookie("soularab_admin", "", 0) });
     }
 
     if (req.method === "GET" && req.url === "/api/auth/me") {
-      const session = requireFounder(req, res);
+      const session = await requireFounder(req, res);
       if (!session) return;
       return json(res, 200, { ok: true, user: { username: session.username, role: session.role }, csrfToken: session.csrf });
     }
 
     if (req.method === "GET" && req.url === "/api/control/public-status") {
-      const session = requireFounder(req, res);
+      const session = await requireFounder(req, res);
       if (!session) return;
       try {
         const upstream = await fetch(publicApiUrl + "/api/public/status", {
@@ -213,7 +284,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "GET" && req.url === "/api/control/activation-overview") {
-      const session = requireFounder(req, res);
+      const session = await requireFounder(req, res);
       if (!session) return;
       const upstream = await fetch(publicApiUrl + "/internal/activation/overview", {
         headers: { authorization: "Bearer " + serviceToken }
@@ -224,7 +295,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "GET" && req.url === "/api/control/permit-requests") {
-      const session = requireFounder(req, res);
+      const session = await requireFounder(req, res);
       if (!session) return;
       const upstream = await fetch(publicApiUrl + "/internal/activation/requests", {
         headers: { authorization: "Bearer " + serviceToken }
@@ -235,7 +306,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "POST" && req.url === "/api/control/permit-review") {
-      const session = requireFounder(req, res);
+      const session = await requireFounder(req, res);
       if (!session) return;
       if (req.headers["x-csrf-token"] !== session.csrf) {
         await audit(req, "activation.permit-review", "csrf_denied");
@@ -263,7 +334,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "POST" && req.url === "/api/control/public-config") {
-      const session = requireFounder(req, res);
+      const session = await requireFounder(req, res);
       if (!session) return;
       if (req.headers["x-csrf-token"] !== session.csrf) {
         await audit(req, "control.public-config", "csrf_denied");

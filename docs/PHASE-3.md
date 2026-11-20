@@ -20,7 +20,7 @@
 
 ## Not implemented yet
 - Periodic cleanup of expired in-memory sessions and rate-limit entries. Expired sessions are removed when accessed; rate-limit history is pruned on subsequent login attempts. No background cleanup task is configured.
-- Persistent session storage with server-side invalidation.
+- Production-grade shared session and application-state storage with cross-instance invalidation (current file-backed stores are single-instance development only).
 - Persistent, append-only audit storage with retention controls.
 - External secret-manager integration.
 - External monitoring and alerting.
@@ -31,7 +31,7 @@
 ## Required before production
 - HTTPS termination and secure transport.
 - Keep the admin service behind a private network/edge access policy.
-- Persistent session storage with revocation.
+- Production-grade shared session storage with revocation across instances.
 - Persistent audit storage, access controls, backups, and retention policy.
 - Secret-manager integration and tested rotation.
 - External monitoring/alerting.

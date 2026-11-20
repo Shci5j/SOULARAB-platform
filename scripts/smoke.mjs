@@ -6,6 +6,8 @@ import { join } from "node:path";
 import { rm } from "node:fs/promises";
 
 const activationStore = join(tmpdir(), "soularab-activation-smoke-" + randomUUID() + ".json");
+const sessionStore = join(tmpdir(), "soularab-session-smoke-" + randomUUID() + ".json");
+const configStore = join(tmpdir(), "soularab-config-smoke-" + randomUUID() + ".json");
 
 const env = {
   ...process.env,
@@ -17,7 +19,9 @@ const env = {
   SERVICE_CONTROL_TOKEN: "phase2-service-token-01234567890123456789",
   PUBLIC_API_URL: "http://127.0.0.1:4100",
   AUDIT_LOG_FILE: "./.data/smoke-audit.log",
-  ACTIVATION_STORE_FILE: activationStore
+  ACTIVATION_STORE_FILE: activationStore,
+  SESSION_STORE_FILE: sessionStore,
+  PUBLIC_CONFIG_FILE: configStore
 };
 
 const processes = [
@@ -140,6 +144,17 @@ try {
   const cookie = login.headers.get("set-cookie")?.split(";")[0];
   if (!cookie || !data.csrfToken) throw new Error("session material missing");
 
+  const previousAdmin = processes[1];
+  const adminStopped = new Promise(resolve => previousAdmin.once("exit", resolve));
+  previousAdmin.kill("SIGTERM");
+  await adminStopped;
+  processes[1] = spawn(process.execPath, ["apps/admin/src/server.js"], { env, stdio: "ignore" });
+  const restoredSession = await request("http://127.0.0.1:3100/api/auth/me", { headers: { cookie } });
+  const restoredSessionData = await restoredSession.json();
+  if (!restoredSession.ok || restoredSessionData.csrfToken !== data.csrfToken) {
+    throw new Error("founder session did not persist across restart");
+  }
+
   const activationOverview = await request("http://127.0.0.1:3100/api/control/activation-overview", { headers: { cookie } });
   const overviewData = await activationOverview.json();
   if (!activationOverview.ok || overviewData.overview.pendingRequests !== 1) throw new Error("founder activation overview failed");
@@ -200,14 +215,35 @@ try {
     throw new Error("public configuration was not updated");
   }
 
+  const publicBeforeConfigRestart = processes[0];
+  const publicConfigStopped = new Promise(resolve => publicBeforeConfigRestart.once("exit", resolve));
+  publicBeforeConfigRestart.kill("SIGTERM");
+  await publicConfigStopped;
+  processes[0] = spawn(process.execPath, ["apps/public/src/server.js"], { env, stdio: "ignore" });
+  const persistedStatus = await request("http://127.0.0.1:4100/api/public/status");
+  const persistedStatusData = await persistedStatus.json();
+  if (!persistedStatus.ok || persistedStatusData.config.message !== "controlled by founder") {
+    throw new Error("public configuration did not persist across restart");
+  }
+
   const logout = await request("http://127.0.0.1:3100/api/auth/logout", {
     method: "POST",
     headers: { cookie, "x-csrf-token": data.csrfToken }
   });
   if (!logout.ok) throw new Error("logout failed");
 
+  const adminBeforeLogoutRestart = processes[1];
+  const adminLogoutStopped = new Promise(resolve => adminBeforeLogoutRestart.once("exit", resolve));
+  adminBeforeLogoutRestart.kill("SIGTERM");
+  await adminLogoutStopped;
+  processes[1] = spawn(process.execPath, ["apps/admin/src/server.js"], { env, stdio: "ignore" });
+  const revokedSession = await request("http://127.0.0.1:3100/api/auth/me", { headers: { cookie } });
+  if (revokedSession.status !== 401) throw new Error("logout revocation did not persist");
+
   console.log("PHASE2_SMOKE_OK");
 } finally {
   for (const child of processes) child.kill("SIGTERM");
   await rm(activationStore, { force: true });
+  await rm(sessionStore, { force: true });
+  await rm(configStore, { force: true });
 }

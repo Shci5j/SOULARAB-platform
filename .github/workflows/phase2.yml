@@ -20,5 +20,6 @@ jobs:
       - run: node --check packages/core/src/config.js
       - run: node --check packages/core/src/audit.js
       - run: node --check packages/core/src/activation-store.js
+      - run: node --check packages/core/src/public-config-store.js
       - run: node scripts/smoke.mjs
       - run: node scripts/security-smoke.mjs
