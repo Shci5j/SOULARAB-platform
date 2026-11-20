@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { rm } from "node:fs/promises";
 
 const activationStore = join(tmpdir(), "soularab-activation-security-" + randomUUID() + ".json");
+const sessionStore = join(tmpdir(), "soularab-session-security-" + randomUUID() + ".json");
 
 const env = {
   ...process.env,
@@ -20,7 +21,8 @@ const env = {
   ADMIN_ALLOWED_ORIGIN: "https://admin.example.test",
   REQUEST_TIMEOUT_MS: "5000",
   AUDIT_LOG_FILE: "./.data/security-smoke-audit.log",
-  ACTIVATION_STORE_FILE: activationStore
+  ACTIVATION_STORE_FILE: activationStore,
+  SESSION_STORE_FILE: sessionStore
 };
 
 const children = [
@@ -115,4 +117,5 @@ try {
 } finally {
   for (const child of children) child.kill("SIGTERM");
   await rm(activationStore, { force: true });
+  await rm(sessionStore, { force: true });
 }
