@@ -7,7 +7,9 @@ WORKDIR /app
 COPY packages/core ./packages/core
 COPY apps/admin ./apps/admin
 
-RUN mkdir -p /data && chown node:node /data
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx \
+  && mkdir -p /data \
+  && chown node:node /data
 USER node
 
 EXPOSE 3000
