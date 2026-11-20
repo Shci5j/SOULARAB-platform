@@ -29,6 +29,15 @@ async function request(url, options = {}) {
 }
 
 try {
+  const adminPage = await request("http://127.0.0.1:3200/");
+  if (!adminPage.ok || !adminPage.headers.get("content-security-policy")?.includes("script-src 'self'")) {
+    throw new Error("founder interface content security policy failed");
+  }
+  const publicPage = await request("http://127.0.0.1:4200/");
+  if (!publicPage.ok || !publicPage.headers.get("content-security-policy")?.includes("default-src 'none'")) {
+    throw new Error("public interface content security policy failed");
+  }
+
   for (const url of ["http://127.0.0.1:3200/ready", "http://127.0.0.1:4200/ready"]) {
     const r = await request(url);
     if (!r.ok) throw new Error("readiness failed");
@@ -75,7 +84,7 @@ try {
 
   const logout = await request("http://127.0.0.1:3200/api/auth/logout", {
     method: "POST",
-    headers: { cookie, origin: "https://admin.example.test" }
+    headers: { cookie, origin: "https://admin.example.test", "x-csrf-token": data.csrfToken }
   });
   if (!logout.ok) throw new Error("logout failed");
 
