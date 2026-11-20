@@ -1,0 +1,72 @@
+services:
+  public:
+    build:
+      context: .
+      dockerfile: apps/public/Dockerfile
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PUBLIC_PORT: 4000
+      ACTIVATION_STORE_FILE: /data/activation.json
+      PUBLIC_CONFIG_FILE: /data/public-config.json
+      SERVICE_CONTROL_TOKEN: ${SERVICE_CONTROL_TOKEN:?Set SERVICE_CONTROL_TOKEN in the env file}
+    ports:
+      - "127.0.0.1:4000:4000"
+    volumes:
+      - public-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:4000/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+    restart: unless-stopped
+    depends_on:
+      public:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      ADMIN_PORT: 3000
+      ADMIN_USERNAME: ${ADMIN_USERNAME:?Set ADMIN_USERNAME in the env file}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in the env file}
+      ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:?Set ADMIN_SESSION_SECRET in the env file}
+      SERVICE_CONTROL_TOKEN: ${SERVICE_CONTROL_TOKEN:?Set SERVICE_CONTROL_TOKEN in the env file}
+      AUDIT_LOG_SECRET: ${AUDIT_LOG_SECRET:?Set AUDIT_LOG_SECRET in the env file}
+      PUBLIC_API_URL: http://public:4000
+      ADMIN_ALLOWED_ORIGIN: ${ADMIN_ALLOWED_ORIGIN:-http://localhost:3000}
+      REQUEST_TIMEOUT_MS: ${REQUEST_TIMEOUT_MS:-10000}
+      SESSION_STORE_FILE: /data/sessions.json
+      AUDIT_LOG_FILE: /data/audit.log
+    ports:
+      - "127.0.0.1:3000:3000"
+    volumes:
+      - admin-data:/data
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:3000/ready').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+volumes:
+  public-data:
+  admin-data:
