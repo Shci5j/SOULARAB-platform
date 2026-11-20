@@ -24,6 +24,9 @@ async function readBody(req) {
 const server = http.createServer(async (req, res) => {
   const correlationId = req.headers["x-correlation-id"] || randomToken(12);
   try {
+    if (req.method === "GET" && req.url === "/ready") {
+      return json(res, 200, { ok: true, service: "public", ready: true, correlationId });
+    }
     if (req.method === "GET" && req.url === "/health") {
       return json(res, 200, { ok: true, service: "public", correlationId });
     }
@@ -49,4 +52,8 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+const requestTimeoutMs = Number(process.env.REQUEST_TIMEOUT_MS || 10_000);
+server.requestTimeout = requestTimeoutMs;
+server.headersTimeout = Math.min(requestTimeoutMs, 10_000);
+server.keepAliveTimeout = Math.min(requestTimeoutMs, 5_000);
 server.listen(port, () => console.log(`public service listening on ${port}`));
