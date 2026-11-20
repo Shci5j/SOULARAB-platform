@@ -1,6 +1,7 @@
 {
   "name": "@soularab/core",
   "private": true,
-  "version": "0.1.0",
-  "description": "Shared contracts and security boundaries for SOULARAB Platform"
+  "version": "0.2.0",
+  "description": "Shared security helpers, contracts, and audit primitives for SOULARAB Platform",
+  "type": "module"
 }
