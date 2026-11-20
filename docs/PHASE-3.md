@@ -18,6 +18,7 @@
 - Audit events include actor, action, target, timestamp, result, and correlation ID.
 - HMAC hash-chained append-only local audit log, integrity verification, and a founder-only audit viewer. Legacy pre-chain entries are identified but not cryptographically verified. The local chain detects event modification/reordering but cannot independently detect tail truncation without an external anchor.
 - Public and founder web interfaces with same-origin content security policies.
+- Node 24 runtime baseline and local Docker Compose deployment with non-root users, read-only root filesystems, dropped Linux capabilities, localhost-only ports, persistent named volumes, and health checks.
 
 ## Not implemented yet
 - Periodic cleanup of expired in-memory sessions and rate-limit entries. Expired sessions are removed when accessed; rate-limit history is pruned on subsequent login attempts. No background cleanup task is configured.
