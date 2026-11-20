@@ -14,11 +14,11 @@ SOULARAB is built as two separate trust zones: a public portal and a private fou
 - File-backed local persistence for founder sessions, public configuration, and activation records; shared production storage remains pending.
 - Founder console to view service status, update the public status message, and review permit requests.
 - Explicit-consent trial enrollment capped at 10 app-scoped installation IDs, permit submission, founder review, and self-revocation.
-- CSRF protection, origin checks, restrictive content security policies, bounded request bodies, and audit events.
+- CSRF protection, origin checks, restrictive content security policies, bounded request bodies, and an HMAC hash-chained audit log with a founder-only viewer.
 - GitHub Actions syntax, functional, and security smoke checks.
 
 ## Local development
-Use Node.js 20 or newer. Configure non-committed environment variables from the examples in `apps/public/.env.example` and `apps/admin/.env.example`. Use strong, unique secrets and the same `SERVICE_CONTROL_TOKEN` in both services.
+Use Node.js 20 or newer. Configure non-committed environment variables from the examples in `apps/public/.env.example` and `apps/admin/.env.example`. Use strong, unique secrets, set `AUDIT_LOG_SECRET` to a stable random value of at least 32 characters, and use the same `SERVICE_CONTROL_TOKEN` in both services. Keep the audit key stable; rotating it requires a verified audit-log migration.
 
 Start the public service with `npm run dev:public` and the founder service with `npm run dev:admin`. The default local addresses are ports 4000 and 3000 respectively.
 

@@ -132,6 +132,44 @@ async function loadActivation(){
     list.append(card);
   }
 }
+async function loadAudit(){
+  $("#audit-integrity").textContent="جارٍ التحقق…";
+  try{
+    const [integrityData,eventData]=await Promise.all([
+      api("/api/control/audit-integrity"),
+      api("/api/control/audit-events?limit=30")
+    ]);
+    const integrity=integrityData.integrity;
+    $("#audit-integrity").textContent=integrity.ok
+      ?"سليم · "+integrity.signedEventCount+" حدثًا موثقًا"+(integrity.legacyEventCount?" · "+integrity.legacyEventCount+" حدث قديم":"")
+      :"فشل التحقق من سلامة السجل.";
+    const list=$("#audit-events");
+    list.replaceChildren();
+    for(const event of eventData.events){
+      const row=document.createElement("article");
+      row.className="audit-row";
+      const title=document.createElement("strong");
+      title.textContent=event.action+" · "+event.actor;
+      const result=document.createElement("span");
+      result.className="audit-result";
+      result.textContent=event.result;
+      const details=document.createElement("span");
+      details.textContent=new Date(event.timestamp).toLocaleString()+" · "+event.target+" · "+event.correlationId;
+      row.append(title,result,details);
+      list.append(row);
+    }
+    if(!eventData.events.length){
+      const empty=document.createElement("p");
+      empty.className="empty-state";
+      empty.textContent="لا توجد أحداث مسجلة بعد.";
+      list.append(empty);
+    }
+  }catch{
+    $("#audit-integrity").textContent="تعذر التحقق من السجل أو قراءته؛ راجع سلامة ملف التدقيق.";
+    $("#audit-events").replaceChildren();
+  }
+}
+
 async function restore(){
   try{
     const me=await api("/api/auth/me");
@@ -139,7 +177,8 @@ async function restore(){
     showDashboard(me.user);
     await Promise.all([
       loadConfig().catch(()=>{$("#config-message").textContent="تعذر تحميل إعدادات الموقع.";}),
-      loadActivation().catch(()=>{$("#review-message").textContent="تعذر تحميل طلبات التصاريح.";})
+      loadActivation().catch(()=>{$("#review-message").textContent="تعذر تحميل طلبات التصاريح.";}),
+      loadAudit()
     ]);
   }catch{
     showLogin();
@@ -155,7 +194,7 @@ $("#login-form").addEventListener("submit",async event=>{
     showDashboard(data.user);
     $("#password").value="";
     $("#login-message").textContent="";
-    await Promise.all([loadConfig(),loadActivation()]);
+    await Promise.all([loadConfig(),loadActivation(),loadAudit()]);
   }catch(error){
     $("#login-message").textContent=error.message==="invalid_credentials"?"بيانات الدخول غير صحيحة":"تعذر تسجيل الدخول. تحقق من الاتصال والإعدادات.";
   }
@@ -170,6 +209,7 @@ $("#config-form").addEventListener("submit",async event=>{
     $("#config-message").textContent="تعذر حفظ التحديث.";
   }
 });
+$("#refresh-audit").addEventListener("click",loadAudit);
 $("#logout").addEventListener("click",async()=>{
   try{await api("/api/auth/logout",{method:"POST",headers:{"x-csrf-token":csrfToken}});}catch{}
   csrfToken="";

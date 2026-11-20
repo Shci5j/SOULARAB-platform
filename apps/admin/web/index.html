@@ -28,6 +28,12 @@
         <div id="permit-requests" class="permit-requests"></div>
         <p class="notice" id="review-message" role="status"></p>
       </article>
+      <article class="card audit-panel">
+        <p class="eyebrow">AUDIT TRAIL</p><h3>سجل العمليات</h3>
+        <p class="muted">سجل متسلسل محمي بتوقيع HMAC يكشف تعديل الأحداث أو إعادة ترتيبها. كشف حذف نهاية السجل يتطلب نسخة مرجعية خارجية غير مفعّلة بعد.</p>
+        <div class="audit-toolbar"><span id="audit-integrity" role="status">جارٍ التحقق من سلامة السجل…</span><button class="ghost" id="refresh-audit" type="button">تحديث السجل</button></div>
+        <div id="audit-events" class="audit-events"></div>
+      </article>
       <p class="footnote">التغييرات الحالية محفوظة في ذاكرة خدمة التشغيل، وقد تعود إلى القيمة الافتراضية عند إعادة تشغيلها.</p>
     </section>
     <footer>SOULARAB · أدوات المؤسس الخاصة · لا تشارك بيانات الدخول</footer>
