@@ -1,12 +1,28 @@
 # SOULARAB Platform
 
-Foundation for the SOULARAB public platform and private founder control plane.
+SOULARAB is built as two separate trust zones: a public portal and a private founder control plane.
 
-## Architecture
-- `apps/public`: public-facing application
-- `apps/admin`: private founder control plane
-- `packages/core`: shared contracts and configuration
-- `docs`: architecture and operational documentation
+## Repository layout
+- `apps/public` — public website and approved public API
+- `apps/admin` — private founder console and privileged control API
+- `packages/core` — shared configuration, security helpers, and audit contracts
+- `docs` — architecture, security, activation policy, and operational plans
 
-## Phase 1 — Foundation
-The repository establishes the separation between the public surface and the private control plane. Business logic and shared contracts are kept isolated so later phases can activate controlled communication and management.
+## Current capabilities
+- Arabic RTL public portal with service status.
+- Founder login using a signed, HttpOnly, SameSite session cookie.
+- Founder console to view service status and update the public status message.
+- CSRF protection, origin checks, restrictive content security policies, bounded request bodies, and audit events.
+- GitHub Actions syntax, functional, and security smoke checks.
+
+## Local development
+Use Node.js 20 or newer. Configure non-committed environment variables from the examples in `apps/public/.env.example` and `apps/admin/.env.example`. Use strong, unique secrets and the same `SERVICE_CONTROL_TOKEN` in both services.
+
+Start the public service with `npm run dev:public` and the founder service with `npm run dev:admin`. The default local addresses are ports 4000 and 3000 respectively.
+
+Run verification with `node scripts/smoke.mjs` and `node scripts/security-smoke.mjs`.
+
+## Delivery status
+The public and founder interfaces are implemented as a foundation. Persistent data storage, formal authorization workflows, production deployment, and external monitoring are not yet implemented. See `docs/ROADMAP.md` and `docs/ACTIVATION-POLICY.md`.
+
+No production credentials belong in this repository. The founder service must be placed behind a private access policy before production use.
