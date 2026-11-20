@@ -123,6 +123,7 @@ export async function submitPermitRequest(input) {
     if (device?.status === "authorized") return { status: "authorized", existing: true };
     const pending = current.requests.find(item => item.installationId === installationId && item.status === "pending");
     if (pending) return { status: "pending", requestId: pending.requestId, existing: true };
+    if (current.requests.filter(item => item.status === "pending").length >= 100) return { error: "pending_request_limit" };
     const request = {
       requestId: crypto.randomUUID(),
       installationId,
@@ -154,7 +155,9 @@ export async function getFounderActivationOverview() {
 export async function listPermitRequests() {
   await writeQueue;
   const current = await state();
-  return current.requests.slice(-100).reverse().map(({ requestId, installationId, authorityName, jurisdiction, permitReference, contactEmail, status, submittedAt, reviewedAt, decisionReason }) => ({
+  const pending = current.requests.filter(item => item.status === "pending").slice(-100).reverse();
+  const reviewed = current.requests.filter(item => item.status !== "pending").slice(-100).reverse();
+  return [...pending, ...reviewed].map(({ requestId, installationId, authorityName, jurisdiction, permitReference, contactEmail, status, submittedAt, reviewedAt, decisionReason }) => ({
     requestId, installationId, authorityName, jurisdiction, permitReference, contactEmail, status, submittedAt, reviewedAt, decisionReason
   }));
 }
