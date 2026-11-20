@@ -16,7 +16,7 @@
 - GitHub Actions workflow configured to run syntax, functional, and security checks.
 - Secret-rotation procedure documented.
 - Audit events include actor, action, target, timestamp, result, and correlation ID.
-- HMAC hash-chained append-only local audit log, integrity verification, and a founder-only audit viewer. Legacy pre-chain entries are identified but not cryptographically verified.
+- HMAC hash-chained append-only local audit log, integrity verification, and a founder-only audit viewer. Legacy pre-chain entries are identified but not cryptographically verified. The local chain detects event modification/reordering but cannot independently detect tail truncation without an external anchor.
 - Public and founder web interfaces with same-origin content security policies.
 
 ## Not implemented yet
