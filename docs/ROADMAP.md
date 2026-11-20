@@ -13,11 +13,11 @@
 - [x] CSRF and origin protections for privileged actions
 - [x] Controlled admin-to-public communication
 - [x] Initial runtime configuration management
-- [ ] Persistent storage for sessions, audit records, and platform state
-- [ ] Formal authorization and permit review workflow
-- [ ] Trial enrollment and capped pilot registration
-- [ ] Founder review queue with approve/reject and audit trail
-- [ ] User-facing consent and data controls for every optional capability
+- [ ] Production-grade shared storage for sessions, audit records, and platform state
+- [x] Initial formal authorization and permit review workflow (manual verification required)
+- [x] Explicit-consent trial enrollment capped at 10 app-scoped installations
+- [x] Founder review queue with approve/reject and audit trail
+- [x] User-facing enrollment consent and self-revocation; per-feature consent remains pending
 
 ## Phase 3 — Operations
 - [x] Health and readiness endpoints
