@@ -27,7 +27,8 @@
 - External secret-manager integration.
 - External monitoring and alerting.
 - Deployment rollback automation.
-- Dependency and container/image vulnerability scanning.
+- Dependency and container/image vulnerability scanning beyond CodeQL static analysis.
+- CodeQL static analysis workflow and weekly Dependabot update checks are configured.
 - Production configuration validation and enforced HTTPS termination.
 
 ## Required before production

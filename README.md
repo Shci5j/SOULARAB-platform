@@ -15,7 +15,7 @@ SOULARAB is built as two separate trust zones: a public portal and a private fou
 - Founder console to view service status, update the public status message, and review permit requests.
 - Explicit-consent trial enrollment capped at 10 app-scoped installation IDs, permit submission, founder review, and self-revocation.
 - CSRF protection, origin checks, restrictive content security policies, bounded request bodies, and an HMAC hash-chained audit log with a founder-only viewer.
-- GitHub Actions syntax, functional, and security smoke checks.
+- GitHub Actions syntax, functional, security, and container integration checks, plus scheduled CodeQL analysis and Dependabot updates.
 
 ## Local development
 Use Node.js 24 or newer. Configure non-committed environment variables from the examples in `apps/public/.env.example` and `apps/admin/.env.example`. Use strong, unique secrets, set `AUDIT_LOG_SECRET` to a stable random value of at least 32 characters, and use the same `SERVICE_CONTROL_TOKEN` in both services. Keep the audit key stable; rotating it requires a verified audit-log migration.

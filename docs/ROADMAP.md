@@ -27,6 +27,7 @@
 - [ ] External secret manager and tested rotation
 - [ ] External monitoring and alerting
 - [ ] Tested rollback and recovery
+- [x] Scheduled CodeQL static analysis and Dependabot update monitoring
 - [ ] Dependency and container/image vulnerability scanning
 
 ## Release gate
