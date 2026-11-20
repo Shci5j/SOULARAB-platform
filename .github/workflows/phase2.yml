@@ -25,3 +25,20 @@ jobs:
       - run: node scripts/audit-integrity-smoke.mjs
       - run: node scripts/smoke.mjs
       - run: node scripts/security-smoke.mjs
+      - run: docker compose --env-file .env.compose.example config --quiet
+      - run: docker compose --env-file .env.compose.example up --build -d
+      - name: Verify containerized services
+        run: |
+          for attempt in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:4000/ready >/dev/null && curl -fsS http://127.0.0.1:3000/ready >/dev/null; then
+              curl -fsS http://127.0.0.1:4000/ >/dev/null
+              curl -fsS http://127.0.0.1:3000/ >/dev/null
+              exit 0
+            fi
+            sleep 1
+          done
+          docker compose --env-file .env.compose.example logs
+          exit 1
+      - name: Stop containerized services
+        if: always()
+        run: docker compose --env-file .env.compose.example down --volumes
