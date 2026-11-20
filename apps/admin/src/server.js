@@ -245,13 +245,13 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "GET" && req.url === "/api/auth/me") {
-      const session = requireFounder(req, res);
+      const session = await requireFounder(req, res);
       if (!session) return;
       return json(res, 200, { ok: true, user: { username: session.username, role: session.role }, csrfToken: session.csrf });
     }
 
     if (req.method === "GET" && req.url === "/api/control/public-status") {
-      const session = requireFounder(req, res);
+      const session = await requireFounder(req, res);
       if (!session) return;
       try {
         const upstream = await fetch(publicApiUrl + "/api/public/status", {
@@ -266,7 +266,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "GET" && req.url === "/api/control/activation-overview") {
-      const session = requireFounder(req, res);
+      const session = await requireFounder(req, res);
       if (!session) return;
       const upstream = await fetch(publicApiUrl + "/internal/activation/overview", {
         headers: { authorization: "Bearer " + serviceToken }
@@ -277,7 +277,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "GET" && req.url === "/api/control/permit-requests") {
-      const session = requireFounder(req, res);
+      const session = await requireFounder(req, res);
       if (!session) return;
       const upstream = await fetch(publicApiUrl + "/internal/activation/requests", {
         headers: { authorization: "Bearer " + serviceToken }
@@ -288,7 +288,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "POST" && req.url === "/api/control/permit-review") {
-      const session = requireFounder(req, res);
+      const session = await requireFounder(req, res);
       if (!session) return;
       if (req.headers["x-csrf-token"] !== session.csrf) {
         await audit(req, "activation.permit-review", "csrf_denied");
@@ -316,7 +316,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "POST" && req.url === "/api/control/public-config") {
-      const session = requireFounder(req, res);
+      const session = await requireFounder(req, res);
       if (!session) return;
       if (req.headers["x-csrf-token"] !== session.csrf) {
         await audit(req, "control.public-config", "csrf_denied");
