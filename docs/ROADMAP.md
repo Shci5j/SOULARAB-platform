@@ -1,19 +1,35 @@
 # Roadmap
 
 ## Phase 1 — Foundation
-- Repository initialized
-- Public/admin separation established
-- Shared core boundary established
-- Security boundary documented
+<details>
+</details>
+- [x] Repository and workspace structure
+- [x] Separate public application and private founder control plane
+- [x] Shared core boundary and security documentation
+- [x] Arabic RTL public portal
+- [x] Founder login and initial management console
+- [x] Admin-to-public authenticated control path
 
 ## Phase 2 — Activation
-- Authentication and authorization
-- Secure admin-to-public communication
-- Runtime configuration and management
-- Validation and security controls
+- [x] Founder authentication and session handling
+- [x] CSRF and origin protections for privileged actions
+- [x] Controlled admin-to-public communication
+- [x] Initial runtime configuration management
+- [ ] Persistent storage for sessions, audit records, and platform state
+- [ ] Formal authorization and permit review workflow
+- [ ] Trial enrollment and capped pilot registration
+- [ ] Founder review queue with approve/reject and audit trail
+- [ ] User-facing consent and data controls for every optional capability
 
 ## Phase 3 — Operations
-- Monitoring and auditability
-- Deployment workflow
-- Hardening
-- Operational maintenance
+- [x] Health and readiness endpoints
+- [x] Request size and timeout hardening
+- [x] Functional and security smoke tests in GitHub Actions
+- [ ] Production deployment and HTTPS edge configuration
+- [ ] External secret manager and tested rotation
+- [ ] External monitoring and alerting
+- [ ] Tested rollback and recovery
+- [ ] Dependency and container/image vulnerability scanning
+
+## Release gate
+Do not activate sensitive capabilities or deploy publicly until legal authorization, explicit user consent, secure persistent storage, and the production security checklist are verified.
