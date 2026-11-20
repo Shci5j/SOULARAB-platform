@@ -114,7 +114,7 @@ const server = http.createServer(async (req, res) => {
       }
       if (req.method === "POST" && req.url === "/internal/activation/review") {
         const body = await readBody(req);
-        const result = await reviewPermitRequest({ ...body, reviewer: "founder" });
+        const result = await reviewPermitRequest({ ...body, reviewer: body.reviewer || "founder" });
         if (result.error) {
           const status = result.error === "request_not_found" ? 404 : 400;
           return json(res, status, { error: result.error, correlationId });
