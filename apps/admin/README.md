@@ -1,3 +1,10 @@
 # Founder Control Plane
 
-Private administration boundary for founder operations. Must never be treated as a public application surface.
+Private control boundary.
+
+## Required controls
+- authenticated founder session
+- role-based authorization
+- protected administrative API
+- audit logging
+- no secrets in client-side/public bundles
