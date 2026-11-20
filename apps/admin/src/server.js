@@ -212,6 +212,56 @@ const server = http.createServer(async (req, res) => {
       }
     }
 
+    if (req.method === "GET" && req.url === "/api/control/activation-overview") {
+      const session = requireFounder(req, res);
+      if (!session) return;
+      const upstream = await fetch(publicApiUrl + "/internal/activation/overview", {
+        headers: { authorization: "Bearer " + serviceToken }
+      });
+      if (!upstream.ok) return json(res, 502, { error: "activation_service_unavailable" });
+      const data = await upstream.json();
+      return json(res, 200, data);
+    }
+
+    if (req.method === "GET" && req.url === "/api/control/permit-requests") {
+      const session = requireFounder(req, res);
+      if (!session) return;
+      const upstream = await fetch(publicApiUrl + "/internal/activation/requests", {
+        headers: { authorization: "Bearer " + serviceToken }
+      });
+      if (!upstream.ok) return json(res, 502, { error: "activation_service_unavailable" });
+      const data = await upstream.json();
+      return json(res, 200, data);
+    }
+
+    if (req.method === "POST" && req.url === "/api/control/permit-review") {
+      const session = requireFounder(req, res);
+      if (!session) return;
+      if (req.headers["x-csrf-token"] !== session.csrf) {
+        await audit(req, "activation.permit-review", "csrf_denied");
+        return json(res, 403, { error: "csrf_denied" });
+      }
+      const body = await readBody(req);
+      const upstream = await fetch(publicApiUrl + "/internal/activation/review", {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          authorization: "Bearer " + serviceToken
+        },
+        body: JSON.stringify({ ...body, reviewer: session.username })
+      });
+      const data = await upstream.json().catch(() => ({ error: "activation_service_unavailable" }));
+      if (!upstream.ok) {
+        await audit(req, "activation.permit-review", "denied", { error: data.error || "upstream_error" });
+        return json(res, upstream.status === 400 ? 400 : 502, data);
+      }
+      await audit(req, "activation.permit-review", "success", {
+        requestId: body.requestId,
+        decision: body.decision
+      });
+      return json(res, 200, data);
+    }
+
     if (req.method === "POST" && req.url === "/api/control/public-config") {
       const session = requireFounder(req, res);
       if (!session) return;

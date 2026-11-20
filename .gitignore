@@ -15,3 +15,7 @@ coverage/
 # Local tooling
 .DS_Store
 *.log
+
+# Local activation/session state
+.data/
+*.tmp\n

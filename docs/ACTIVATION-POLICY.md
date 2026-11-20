@@ -30,7 +30,9 @@ A permit request remains pending until a human reviewer verifies its authenticit
 
 ## Implementation status
 
-This document defines the release policy. The permit registry, persistent installation counter, review queue, revocation controls, and consent receipts are not yet implemented. Do not treat the current public message control as an activation or authorization system.
+The repository now includes a file-backed registry for app-scoped installation IDs, a 10-installation trial cap, permit requests, founder review, and user revocation. Enrollment and permit-data submission require separate explicit consent and record the consent version. The local JSON store is single-instance development storage only; it is not a production-grade shared database. Manual review records the founder's verification assertion but does not independently verify the authority. Do not treat an approved record as legal advice or as permission to collect data beyond the permit's verified scope. No sensitive capability is enabled by this workflow.
+
+The 10-installation cap counts registered app installations, not verified physical devices. Clearing browser storage can create a new app-scoped ID; the current system does not use hardware fingerprints or device attestation. A production-grade device limit requires a privacy-reviewed, platform-supported attestation mechanism.
 
 ## Production gate
 

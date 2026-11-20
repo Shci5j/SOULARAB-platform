@@ -1,5 +1,11 @@
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
+import { randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { rm } from "node:fs/promises";
+
+const activationStore = join(tmpdir(), "soularab-activation-smoke-" + randomUUID() + ".json");
 
 const env = {
   ...process.env,
@@ -10,7 +16,8 @@ const env = {
   ADMIN_SESSION_SECRET: "phase2-session-secret-01234567890123456789",
   SERVICE_CONTROL_TOKEN: "phase2-service-token-01234567890123456789",
   PUBLIC_API_URL: "http://127.0.0.1:4100",
-  AUDIT_LOG_FILE: "./.data/smoke-audit.log"
+  AUDIT_LOG_FILE: "./.data/smoke-audit.log",
+  ACTIVATION_STORE_FILE: activationStore
 };
 
 const processes = [
@@ -35,6 +42,80 @@ try {
   const adminPage = await request("http://127.0.0.1:3100/");
   if (!adminPage.ok || !(await adminPage.text()).includes("مركز التحكم")) throw new Error("founder interface failed");
 
+  const policyResponse = await request("http://127.0.0.1:4100/api/activation/policy");
+  const policy = await policyResponse.json();
+  if (!policyResponse.ok || policy.policy.trialLimit !== 10) throw new Error("activation policy failed");
+
+  const noConsent = await request("http://127.0.0.1:4100/api/activation/enroll", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ installationId: randomUUID(), consent: false, consentVersion: "2026-01" })
+  });
+  if (noConsent.status !== 400) throw new Error("explicit activation consent was not enforced");
+
+  const trialIds = [];
+  for (let i = 0; i < 10; i++) {
+    const installationId = randomUUID();
+    trialIds.push(installationId);
+    const enrolled = await request("http://127.0.0.1:4100/api/activation/enroll", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ installationId, consent: true, consentVersion: "2026-01" })
+    });
+    const enrolledData = await enrolled.json();
+    if (!enrolled.ok || enrolledData.status !== "trial") throw new Error("trial enrollment failed at slot " + (i + 1));
+  }
+
+  const extraInstallationId = randomUUID();
+  const capped = await request("http://127.0.0.1:4100/api/activation/enroll", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ installationId: extraInstallationId, consent: true, consentVersion: "2026-01" })
+  });
+  if (capped.status !== 409) throw new Error("10-installation trial cap failed");
+
+  const permitConsentDenied = await request("http://127.0.0.1:4100/api/activation/permit-request", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      installationId: extraInstallationId,
+      authorityName: "Example Competent Authority",
+      jurisdiction: "Test jurisdiction",
+      permitReference: "TEST-PERMIT-001",
+      contactEmail: "review@example.test",
+      consent: false,
+      consentVersion: "2026-01"
+    })
+  });
+  if (permitConsentDenied.status !== 400) throw new Error("permit data accepted without consent");
+
+  const permitRequest = await request("http://127.0.0.1:4100/api/activation/permit-request", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      installationId: extraInstallationId,
+      authorityName: "Example Competent Authority",
+      jurisdiction: "Test jurisdiction",
+      permitReference: "TEST-PERMIT-001",
+      contactEmail: "review@example.test",
+      consent: true,
+      consentVersion: "2026-01"
+    })
+  });
+  const permitData = await permitRequest.json();
+  if (permitRequest.status !== 202 || permitData.status !== "pending") throw new Error("permit request submission failed");
+
+  const previousPublic = processes[0];
+  const stopped = new Promise(resolve => previousPublic.once("exit", resolve));
+  previousPublic.kill("SIGTERM");
+  await stopped;
+  processes[0] = spawn(process.execPath, ["apps/public/src/server.js"], { env, stdio: "ignore" });
+  const persistedPolicyResponse = await request("http://127.0.0.1:4100/api/activation/policy");
+  const persistedPolicy = await persistedPolicyResponse.json();
+  if (!persistedPolicyResponse.ok || persistedPolicy.policy.trialEnrolled !== 10) {
+    throw new Error("activation registry did not persist across restart");
+  }
+
   const publicHealth = await request("http://127.0.0.1:4100/health");
   if (!publicHealth.ok) throw new Error("public health failed");
 
@@ -58,6 +139,42 @@ try {
   const data = await login.json();
   const cookie = login.headers.get("set-cookie")?.split(";")[0];
   if (!cookie || !data.csrfToken) throw new Error("session material missing");
+
+  const activationOverview = await request("http://127.0.0.1:3100/api/control/activation-overview", { headers: { cookie } });
+  const overviewData = await activationOverview.json();
+  if (!activationOverview.ok || overviewData.overview.pendingRequests !== 1) throw new Error("founder activation overview failed");
+
+  const reviewDenied = await request("http://127.0.0.1:3100/api/control/permit-review", {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie },
+    body: JSON.stringify({ requestId: permitData.requestId, decision: "approve", verifiedPermit: true, reason: "Verified" })
+  });
+  if (reviewDenied.status !== 403) throw new Error("permit review csrf protection failed");
+
+  const unverifiedReview = await request("http://127.0.0.1:3100/api/control/permit-review", {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie, "x-csrf-token": data.csrfToken },
+    body: JSON.stringify({ requestId: permitData.requestId, decision: "approve", verifiedPermit: false, reason: "Not verified" })
+  });
+  if (unverifiedReview.status !== 400) throw new Error("permit approval bypassed verification gate");
+
+  const approvedReview = await request("http://127.0.0.1:3100/api/control/permit-review", {
+    method: "POST",
+    headers: { "content-type": "application/json", cookie, "x-csrf-token": data.csrfToken },
+    body: JSON.stringify({ requestId: permitData.requestId, decision: "approve", verifiedPermit: true, reason: "Verified by test reviewer" })
+  });
+  if (!approvedReview.ok) throw new Error("verified permit review failed");
+
+  const authorizedStatus = await request("http://127.0.0.1:4100/api/activation/status?installationId=" + encodeURIComponent(extraInstallationId));
+  const authorizedData = await authorizedStatus.json();
+  if (!authorizedStatus.ok || authorizedData.installation.status !== "authorized") throw new Error("permit authorization was not applied");
+
+  const revoked = await request("http://127.0.0.1:4100/api/activation/revoke", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ installationId: extraInstallationId })
+  });
+  if (!revoked.ok) throw new Error("user revocation failed");
 
   const me = await request("http://127.0.0.1:3100/api/auth/me", { headers: { cookie } });
   const meData = await me.json();
@@ -92,4 +209,5 @@ try {
   console.log("PHASE2_SMOKE_OK");
 } finally {
   for (const child of processes) child.kill("SIGTERM");
+  await rm(activationStore, { force: true });
 }
