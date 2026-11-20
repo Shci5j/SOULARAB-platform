@@ -164,10 +164,10 @@ async function requireFounder(req, res) {
   return session;
 }
 
-async function audit(req, action, result, metadata = {}) {
-  const session = await sessionFrom(req);
+async function audit(req, action, result, metadata = {}, actorOverride = null) {
+  const session = actorOverride ? null : await sessionFrom(req);
   return writeAuditEvent({
-    actor: session?.username || "anonymous",
+    actor: actorOverride || session?.username || "anonymous",
     action,
     target: "admin-control-plane",
     result,
@@ -214,13 +214,19 @@ const server = http.createServer(async (req, res) => {
       }
       const token = randomToken(48);
       const csrf = randomToken(32);
-      sessions.set(sessionKey(token), {
+      const sessionRecord = {
         username: adminUser,
         role: "founder",
         csrf,
         expiresAt: Date.now() + 8 * 60 * 60 * 1000
-      });
-      await persistSessions();
+      };
+      sessions.set(sessionKey(token), sessionRecord);
+      try {
+        await persistSessions();
+      } catch (error) {
+        sessions.delete(sessionKey(token));
+        throw error;
+      }
       await audit(req, "auth.login", "success");
       return json(res, 200, {
         ok: true,
@@ -238,9 +244,21 @@ const server = http.createServer(async (req, res) => {
         await audit(req, "auth.logout", "csrf_denied");
         return json(res, 403, { error: "csrf_denied" });
       }
-      sessions.delete(sessionKey(session.token));
-      await persistSessions();
-      await audit(req, "auth.logout", "success");
+      const key = sessionKey(session.token);
+      sessions.delete(key);
+      try {
+        await persistSessions();
+      } catch (error) {
+        sessions.set(key, {
+          username: session.username,
+          role: session.role,
+          csrf: session.csrf,
+          expiresAt: session.expiresAt
+        });
+        await audit(req, "auth.logout", "storage_error", {}, session.username);
+        throw error;
+      }
+      await audit(req, "auth.logout", "success", {}, session.username);
       return json(res, 200, { ok: true }, { "set-cookie": cookie("soularab_admin", "", 0) });
     }
 
