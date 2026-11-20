@@ -1,3 +1,9 @@
 # Public Platform
 
-User-facing application boundary. Phase 2 activates runtime features.
+User-facing boundary.
+
+## Rules
+- no privileged credentials
+- no direct access to admin internals
+- consume only approved public APIs
+- validate all external input
