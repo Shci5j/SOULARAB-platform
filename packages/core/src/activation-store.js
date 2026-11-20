@@ -108,8 +108,9 @@ export async function enrollInstallation({ installationId, consent, consentVersi
 }
 
 export async function submitPermitRequest(input) {
-  const { installationId, authorityName, jurisdiction, permitReference, contactEmail } = input || {};
+  const { installationId, authorityName, jurisdiction, permitReference, contactEmail, consent, consentVersion } = input || {};
   if (!validInstallationId(installationId)) return { error: "invalid_installation_id" };
+  if (consent !== true || consentVersion !== "2026-01") return { error: "explicit_consent_required" };
   const fields = [authorityName, jurisdiction, permitReference, contactEmail];
   if (fields.some(value => typeof value !== "string" || !value.trim())) return { error: "missing_permit_details" };
   if (authorityName.length > 160 || jurisdiction.length > 120 || permitReference.length > 120 || contactEmail.length > 254) {
@@ -129,6 +130,7 @@ export async function submitPermitRequest(input) {
       jurisdiction: jurisdiction.trim(),
       permitReference: permitReference.trim(),
       contactEmail: contactEmail.trim(),
+      consentVersion,
       status: "pending",
       submittedAt: new Date().toISOString()
     };
