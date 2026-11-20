@@ -11,6 +11,7 @@ SOULARAB is built as two separate trust zones: a public portal and a private fou
 ## Current capabilities
 - Arabic RTL public portal with service status.
 - Founder login using a signed, HttpOnly, SameSite session cookie, with hashed-token session persistence for single-instance development.
+- File-backed local persistence for founder sessions, public configuration, and activation records; shared production storage remains pending.
 - Founder console to view service status, update the public status message, and review permit requests.
 - Explicit-consent trial enrollment capped at 10 app-scoped installation IDs, permit submission, founder review, and self-revocation.
 - CSRF protection, origin checks, restrictive content security policies, bounded request bodies, and audit events.
