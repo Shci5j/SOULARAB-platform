@@ -35,6 +35,9 @@ async function inspectLog() {
     } catch {
       return { ok: false, reason: "invalid_json", events, sequence, lastHash, legacyCount };
     }
+    if (!event || typeof event !== "object" || Array.isArray(event)) {
+      return { ok: false, reason: "invalid_event_shape", events, sequence, lastHash, legacyCount };
+    }
 
     if (!Object.hasOwn(event, "hash") && !Object.hasOwn(event, "sequence")) {
       if (sequence > 0) return { ok: false, reason: "legacy_event_after_signed_event", events, sequence, lastHash, legacyCount };
