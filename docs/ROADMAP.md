@@ -1,8 +1,6 @@
 # Roadmap
 
 ## Phase 1 — Foundation
-<details>
-</details>
 - [x] Repository and workspace structure
 - [x] Separate public application and private founder control plane
 - [x] Shared core boundary and security documentation
