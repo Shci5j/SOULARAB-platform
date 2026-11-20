@@ -21,6 +21,13 @@
       <div class="dash-head"><div><p class="eyebrow">OVERVIEW</p><h2>لوحة المنصة</h2><p class="muted" id="welcome"></p></div><button class="ghost" id="logout" type="button">تسجيل الخروج</button></div>
       <div class="grid"><article class="card"><span class="muted">حالة الخدمة العامة</span><strong id="service-state">—</strong><span class="small" id="service-detail">جارٍ التحقق…</span></article><article class="card"><span class="muted">قناة التحكم</span><strong class="good">محمية</strong><span class="small">جلسة مؤسس موثقة</span></article></div>
       <article class="card config"><p class="eyebrow">PUBLIC PLATFORM</p><h3>رسالة الحالة العامة</h3><p class="muted">تظهر هذه الرسالة في الصفحة العامة. لا تضع معلومات سرية هنا.</p><form id="config-form"><label for="message">الرسالة</label><textarea id="message" maxlength="500" rows="4" required></textarea><button class="primary" type="submit">حفظ التحديث</button></form><p class="notice" id="config-message" role="status"></p></article>
+      <article class="card activation-admin">
+        <p class="eyebrow">AUTHORIZATION</p><h3>طلبات التصاريح والتفعيل</h3>
+        <p class="muted">لا تعتمد أي طلب قبل التحقق اليدوي من الجهة المصدرة ونطاق التصريح وصلاحيته.</p>
+        <div class="activation-stats" id="activation-stats">جارٍ تحميل حالة التفعيل…</div>
+        <div id="permit-requests" class="permit-requests"></div>
+        <p class="notice" id="review-message" role="status"></p>
+      </article>
       <p class="footnote">التغييرات الحالية محفوظة في ذاكرة خدمة التشغيل، وقد تعود إلى القيمة الافتراضية عند إعادة تشغيلها.</p>
     </section>
     <footer>SOULARAB · أدوات المؤسس الخاصة · لا تشارك بيانات الدخول</footer>
