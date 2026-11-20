@@ -7,6 +7,7 @@ import { rm } from "node:fs/promises";
 
 const activationStore = join(tmpdir(), "soularab-activation-smoke-" + randomUUID() + ".json");
 const sessionStore = join(tmpdir(), "soularab-session-smoke-" + randomUUID() + ".json");
+const configStore = join(tmpdir(), "soularab-config-smoke-" + randomUUID() + ".json");
 
 const env = {
   ...process.env,
@@ -19,7 +20,8 @@ const env = {
   PUBLIC_API_URL: "http://127.0.0.1:4100",
   AUDIT_LOG_FILE: "./.data/smoke-audit.log",
   ACTIVATION_STORE_FILE: activationStore,
-  SESSION_STORE_FILE: sessionStore
+  SESSION_STORE_FILE: sessionStore,
+  PUBLIC_CONFIG_FILE: configStore
 };
 
 const processes = [
@@ -213,6 +215,17 @@ try {
     throw new Error("public configuration was not updated");
   }
 
+  const publicBeforeConfigRestart = processes[0];
+  const publicConfigStopped = new Promise(resolve => publicBeforeConfigRestart.once("exit", resolve));
+  publicBeforeConfigRestart.kill("SIGTERM");
+  await publicConfigStopped;
+  processes[0] = spawn(process.execPath, ["apps/public/src/server.js"], { env, stdio: "ignore" });
+  const persistedStatus = await request("http://127.0.0.1:4100/api/public/status");
+  const persistedStatusData = await persistedStatus.json();
+  if (!persistedStatus.ok || persistedStatusData.config.message !== "controlled by founder") {
+    throw new Error("public configuration did not persist across restart");
+  }
+
   const logout = await request("http://127.0.0.1:3100/api/auth/logout", {
     method: "POST",
     headers: { cookie, "x-csrf-token": data.csrfToken }
@@ -232,4 +245,5 @@ try {
   for (const child of processes) child.kill("SIGTERM");
   await rm(activationStore, { force: true });
   await rm(sessionStore, { force: true });
+  await rm(configStore, { force: true });
 }
