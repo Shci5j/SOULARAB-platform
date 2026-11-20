@@ -8,7 +8,7 @@ import {
   requireStrongSecret,
   timingSafeEqualText
 } from "../../../packages/core/src/config.js";
-import { writeAuditEvent } from "../../../packages/core/src/audit.js";
+import { readAuditEvents, verifyAuditLog, writeAuditEvent } from "../../../packages/core/src/audit.js";
 import { securityHeaders, assertSafeOrigin } from "./security.js";
 
 const port = Number(process.env.ADMIN_PORT || 3000);
@@ -193,6 +193,8 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "GET" && req.url === "/ready") {
+      const integrity = await verifyAuditLog();
+      if (!integrity.ok) return json(res, 503, { ok: false, service: "admin", ready: false, reason: "audit_integrity_failed" });
       return json(res, 200, { ok: true, service: "admin", ready: true });
     }
 
@@ -223,11 +225,12 @@ const server = http.createServer(async (req, res) => {
       sessions.set(sessionKey(token), sessionRecord);
       try {
         await persistSessions();
+        await audit(req, "auth.login", "success");
       } catch (error) {
         sessions.delete(sessionKey(token));
+        await persistSessions();
         throw error;
       }
-      await audit(req, "auth.login", "success");
       return json(res, 200, {
         ok: true,
         user: { username: adminUser, role: "founder" },
@@ -266,6 +269,27 @@ const server = http.createServer(async (req, res) => {
       const session = await requireFounder(req, res);
       if (!session) return;
       return json(res, 200, { ok: true, user: { username: session.username, role: session.role }, csrfToken: session.csrf });
+    }
+
+    if (req.method === "GET" && req.url === "/api/control/audit-integrity") {
+      const session = await requireFounder(req, res);
+      if (!session) return;
+      const integrity = await verifyAuditLog();
+      return json(res, integrity.ok ? 200 : 503, { ok: integrity.ok, integrity });
+    }
+
+    if (req.method === "GET" && req.url.startsWith("/api/control/audit-events")) {
+      const session = await requireFounder(req, res);
+      if (!session) return;
+      const url = new URL(req.url, "http://localhost");
+      const limit = Number(url.searchParams.get("limit") || 50);
+      if (!Number.isSafeInteger(limit) || limit < 1 || limit > 100) {
+        return json(res, 400, { error: "invalid_limit" });
+      }
+      const integrity = await verifyAuditLog();
+      if (!integrity.ok) return json(res, 503, { error: "audit_integrity_failed" });
+      const events = await readAuditEvents(limit);
+      return json(res, 200, { ok: true, events, integrity });
     }
 
     if (req.method === "GET" && req.url === "/api/control/public-status") {
@@ -365,7 +389,11 @@ const server = http.createServer(async (req, res) => {
 
     return json(res, 404, { error: "not_found" });
   } catch (error) {
-    await audit(req, "request", "error", { message: error.message });
+    try {
+      await audit(req, "request", "error", { message: error.message });
+    } catch {
+      // Preserve the HTTP error response if the audit chain itself is unavailable.
+    }
     return json(res, error.statusCode || 500, {
       error: error.statusCode === 413 ? "payload_too_large" :
         error.statusCode === 400 ? "invalid_request" : "internal_error"
