@@ -157,6 +157,17 @@ try {
     throw new Error("founder session did not persist across restart");
   }
 
+  const auditIntegrityResponse = await request("http://127.0.0.1:3100/api/control/audit-integrity", { headers: { cookie } });
+  const auditIntegrityData = await auditIntegrityResponse.json();
+  if (!auditIntegrityResponse.ok || !auditIntegrityData.integrity.ok || auditIntegrityData.integrity.signedEventCount < 2) {
+    throw new Error("audit integrity verification failed");
+  }
+  const auditEventsResponse = await request("http://127.0.0.1:3100/api/control/audit-events?limit=20", { headers: { cookie } });
+  const auditEventsData = await auditEventsResponse.json();
+  if (!auditEventsResponse.ok || !auditEventsData.events.some(event => event.action === "auth.login")) {
+    throw new Error("founder audit event listing failed");
+  }
+
   const activationOverview = await request("http://127.0.0.1:3100/api/control/activation-overview", { headers: { cookie } });
   const overviewData = await activationOverview.json();
   if (!activationOverview.ok || overviewData.overview.pendingRequests !== 1) throw new Error("founder activation overview failed");
