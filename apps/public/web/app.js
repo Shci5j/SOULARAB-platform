@@ -28,10 +28,17 @@ async function refreshActivation(){
   const statusResult=await requestJson("/api/activation/status?installationId="+encodeURIComponent(installationId));
   if(statusResult.response.ok){
     const state=statusResult.data.installation.status;
-    $("#activation-status").textContent=state==="trial"?"هذا التثبيت مسجل ضمن النسخة التجريبية.":state==="authorized"?"تم اعتماد هذا التثبيت بعد مراجعة التصريح.":"تم إلغاء تسجيل هذا التثبيت.";
-    $("#revoke-button").classList.toggle("hidden",state==="revoked");
-    $("#activate-button").classList.toggle("hidden",state!=="revoked");
-    if(state==="revoked")$("#activate-button").disabled=true;
+    const messages={
+      trial:"هذا التثبيت مسجل ضمن النسخة التجريبية.",
+      authorized:"تم اعتماد هذا التثبيت بعد مراجعة التصريح.",
+      revoked:"تم إلغاء تسجيل هذا التثبيت.",
+      pending_review:"طلب التصريح بانتظار مراجعة المؤسس.",
+      rejected:"تم رفض طلب التصريح. يمكنك مراجعة السبب أو تقديم طلب جديد."
+    };
+    $("#activation-status").textContent=messages[state]||"حالة التثبيت غير معروفة.";
+    $("#revoke-button").classList.toggle("hidden",state!=="trial"&&state!=="authorized");
+    $("#activate-button").classList.add("hidden");
+    $("#permit-form").classList.toggle("hidden",state!=="rejected");
   }else if(policy.permitRequiredForAdditionalInstallations){
     $("#activation-status").textContent="اكتمل العدد التجريبي. يلزم تقديم بيانات التصريح للمراجعة.";
     $("#permit-form").classList.remove("hidden");
