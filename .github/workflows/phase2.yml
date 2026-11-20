@@ -12,7 +12,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 24
       - run: node --check apps/admin/src/server.js
       - run: node --check apps/public/src/server.js
       - run: node --check apps/admin/web/app.js
