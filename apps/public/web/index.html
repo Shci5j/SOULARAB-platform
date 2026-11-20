@@ -29,7 +29,7 @@
     <section class="activation" id="activation">
       <p class="eyebrow">03 / التفعيل التجريبي</p>
       <h2>تفعيل اختياري وواضح.</h2>
-      <p>النسخة التجريبية محدودة بعشرة معرّفات تثبيت للتطبيق. عند التسجيل يُنشأ معرّف عشوائي خاص بهذا التطبيق فقط؛ لا نقرأ IMEI أو الرقم التسلسلي أو موقعك أو محتوى الشاشة.</p>
+      <p>النسخة التجريبية محدودة بعشرة معرّفات تثبيت للتطبيق، وليست تحققًا ماديًا من هوية الهاتف. عند التسجيل يُنشأ معرّف عشوائي خاص بهذا التطبيق فقط؛ لا نقرأ IMEI أو الرقم التسلسلي أو موقعك أو محتوى الشاشة.</p>
       <p id="activation-policy" class="policy-note">جارٍ تحميل سياسة التفعيل…</p>
       <label class="consent"><input type="checkbox" id="activation-consent"><span>أوافق على تسجيل معرّف التثبيت العشوائي وإظهار حالة التفعيل لهذا التطبيق. يمكنني إلغاء التسجيل لاحقًا.</span></label>
       <button class="button primary" id="activate-button" type="button">تسجيل هذا التثبيت</button>
@@ -40,7 +40,7 @@
         <label for="authority-name">اسم الجهة المصدرة</label><input id="authority-name" maxlength="160" required>
         <label for="jurisdiction">الدولة أو النطاق القانوني</label><input id="jurisdiction" maxlength="120" required>
         <label for="permit-reference">رقم أو مرجع التصريح</label><input id="permit-reference" maxlength="120" required>
-        <label for="contact-email">بريد للتواصل بشأن المراجعة</label><input id="contact-email" type="email" maxlength="254" required>
+        <label for="contact-email">بريد للتواصل بشأن المراجعة</label><input id="contact-email" type="email" maxlength="254" required><label class="consent"><input type="checkbox" id="permit-consent"><span>أوافق على استخدام بيانات التصريح والبريد فقط لمراجعة الطلب والتواصل بشأنه.</span></label>
         <button class="button primary" type="submit">إرسال طلب المراجعة</button>
       </form>
       <button class="button secondary hidden" id="revoke-button" type="button">إلغاء تسجيل هذا التثبيت</button>
