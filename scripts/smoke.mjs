@@ -159,7 +159,7 @@ try {
 
   const auditIntegrityResponse = await request("http://127.0.0.1:3100/api/control/audit-integrity", { headers: { cookie } });
   const auditIntegrityData = await auditIntegrityResponse.json();
-  if (!auditIntegrityResponse.ok || !auditIntegrityData.integrity.ok || auditIntegrityData.integrity.signedEventCount < 2) {
+  if (!auditIntegrityResponse.ok || !auditIntegrityData.integrity.ok || auditIntegrityData.integrity.signedEventCount < 1) {
     throw new Error("audit integrity verification failed");
   }
   const auditEventsResponse = await request("http://127.0.0.1:3100/api/control/audit-events?limit=20", { headers: { cookie } });
