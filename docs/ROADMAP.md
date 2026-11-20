@@ -23,12 +23,15 @@
 - [x] Health and readiness endpoints
 - [x] Request size and timeout hardening
 - [x] Functional and security smoke tests in GitHub Actions
-- [ ] Production deployment and HTTPS edge configuration
+- [x] Security-scan workflow for dependencies and container images (verification still required)
+- [x] Production configuration validation
+- [x] Storage, backup, secret, monitoring, rollback, and HTTPS runbooks
+- [ ] Production-grade shared storage and tested restore
 - [ ] External secret manager and tested rotation
 - [ ] External monitoring and alerting
 - [ ] Tested rollback and recovery
+- [ ] Production deployment and HTTPS edge configuration
 - [x] Scheduled CodeQL static analysis and Dependabot update monitoring
-- [ ] Dependency and container/image vulnerability scanning
 
 ## Release gate
-Do not activate sensitive capabilities or deploy publicly until legal authorization, explicit user consent, secure persistent storage, and the production security checklist are verified.
+Do not activate sensitive capabilities or deploy publicly until legal authorization, explicit user consent, secure persistent storage, external secret management, monitoring, backup/restore, rollback, HTTPS, and the production security checklist are verified.
