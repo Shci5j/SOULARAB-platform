@@ -77,13 +77,32 @@ export async function getInstallationStatus(installationId) {
   await writeQueue;
   const current = await state();
   const device = current.devices.find(item => item.installationId === installationId);
-  if (!device) return null;
-  return {
-    installationId: device.installationId,
-    status: device.status,
-    enrolledAt: device.enrolledAt,
-    revokedAt: device.revokedAt || null
-  };
+  if (device) {
+    return {
+      installationId: device.installationId,
+      status: device.status,
+      enrolledAt: device.enrolledAt,
+      revokedAt: device.revokedAt || null
+    };
+  }
+  const request = current.requests.find(item => item.installationId === installationId && item.status === "pending");
+  if (request) {
+    return {
+      installationId,
+      status: "pending_review",
+      enrolledAt: request.submittedAt
+    };
+  }
+  const rejected = current.requests.find(item => item.installationId === installationId && item.status === "rejected");
+  if (rejected) {
+    return {
+      installationId,
+      status: "rejected",
+      enrolledAt: rejected.submittedAt,
+      decisionReason: rejected.decisionReason
+    };
+  }
+  return null;
 }
 
 export async function enrollInstallation({ installationId, consent, consentVersion }) {
