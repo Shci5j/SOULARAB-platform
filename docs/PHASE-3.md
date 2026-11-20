@@ -20,7 +20,7 @@
 
 ## Not implemented yet
 - Periodic cleanup of expired in-memory sessions and rate-limit entries. Expired sessions are removed when accessed; rate-limit history is pruned on subsequent login attempts. No background cleanup task is configured.
-- Production-grade shared session storage with cross-instance invalidation (current file-backed store is single-instance development only).
+- Production-grade shared session and application-state storage with cross-instance invalidation (current file-backed stores are single-instance development only).
 - Persistent, append-only audit storage with retention controls.
 - External secret-manager integration.
 - External monitoring and alerting.
