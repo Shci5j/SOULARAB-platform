@@ -1,6 +1,7 @@
 import http from "node:http";
 import crypto from "node:crypto";
-import { mkdir, readFile } from "node:fs/promises";
+import { mkdir, readFile, rename, writeFile } from "node:fs/promises";
+import { dirname, resolve } from "node:path";
 import {
   randomToken,
   requireEnv,
@@ -17,14 +18,60 @@ const sessionSecret = requireStrongSecret("ADMIN_SESSION_SECRET");
 const serviceToken = requireStrongSecret("SERVICE_CONTROL_TOKEN");
 const publicApiUrl = process.env.PUBLIC_API_URL || "http://127.0.0.1:4000";
 const allowedOrigin = process.env.ADMIN_ALLOWED_ORIGIN || "";
+const sessionStorePath = resolve(process.env.SESSION_STORE_FILE || "./.data/sessions.json");
 const requestTimeoutMs = Number(process.env.REQUEST_TIMEOUT_MS || 10_000);
 if (!Number.isSafeInteger(requestTimeoutMs) || requestTimeoutMs < 1_000) {
   throw new Error("REQUEST_TIMEOUT_MS must be an integer of at least 1000");
 }
 const sessions = new Map();
 const attempts = new Map();
+let sessionWriteQueue = Promise.resolve();
 
 await mkdir("./.data", { recursive: true });
+
+function sessionKey(token) {
+  return crypto.createHash("sha256").update(token).digest("hex");
+}
+
+async function loadSessionStore() {
+  try {
+    const parsed = JSON.parse(await readFile(sessionStorePath, "utf8"));
+    if (parsed?.version !== 1 || !Array.isArray(parsed.sessions)) {
+      throw new Error("session store has an unsupported format");
+    }
+    for (const entry of parsed.sessions) {
+      if (!Array.isArray(entry) || entry.length !== 2 ||
+          !/^[a-f0-9]{64}$/.test(entry[0]) ||
+          typeof entry[1]?.username !== "string" ||
+          typeof entry[1]?.csrf !== "string" ||
+          !Number.isFinite(entry[1]?.expiresAt) ||
+          entry[1]?.role !== "founder") {
+        throw new Error("session store contains an invalid entry");
+      }
+      sessions.set(entry[0], entry[1]);
+    }
+  } catch (error) {
+    if (error.code !== "ENOENT") throw error;
+  }
+}
+
+async function persistSessions() {
+  const task = sessionWriteQueue.then(async () => {
+    await mkdir(dirname(sessionStorePath), { recursive: true });
+    const temporaryPath = sessionStorePath + "." + crypto.randomUUID() + ".tmp";
+    const data = { version: 1, sessions: [...sessions.entries()] };
+    await writeFile(temporaryPath, JSON.stringify(data, null, 2) + "\n", {
+      encoding: "utf8",
+      mode: 0o600,
+      flag: "wx"
+    });
+    await rename(temporaryPath, sessionStorePath);
+  });
+  sessionWriteQueue = task.catch(() => {});
+  return task;
+}
+
+await loadSessionStore();
 
 function json(res, status, body, headers = {}) {
   securityHeaders(res);
