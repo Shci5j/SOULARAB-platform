@@ -105,8 +105,10 @@ try {
   const permitData = await permitRequest.json();
   if (permitRequest.status !== 202 || permitData.status !== "pending") throw new Error("permit request submission failed");
 
-  processes[0].kill("SIGTERM");
-  await sleep(150);
+  const previousPublic = processes[0];
+  const stopped = new Promise(resolve => previousPublic.once("exit", resolve));
+  previousPublic.kill("SIGTERM");
+  await stopped;
   processes[0] = spawn(process.execPath, ["apps/public/src/server.js"], { env, stdio: "ignore" });
   const persistedPolicyResponse = await request("http://127.0.0.1:4100/api/activation/policy");
   const persistedPolicy = await persistedPolicyResponse.json();
