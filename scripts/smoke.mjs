@@ -105,6 +105,15 @@ try {
   const permitData = await permitRequest.json();
   if (permitRequest.status !== 202 || permitData.status !== "pending") throw new Error("permit request submission failed");
 
+  processes[0].kill("SIGTERM");
+  await sleep(150);
+  processes[0] = spawn(process.execPath, ["apps/public/src/server.js"], { env, stdio: "ignore" });
+  const persistedPolicyResponse = await request("http://127.0.0.1:4100/api/activation/policy");
+  const persistedPolicy = await persistedPolicyResponse.json();
+  if (!persistedPolicyResponse.ok || persistedPolicy.policy.trialEnrolled !== 10) {
+    throw new Error("activation registry did not persist across restart");
+  }
+
   const publicHealth = await request("http://127.0.0.1:4100/health");
   if (!publicHealth.ok) throw new Error("public health failed");
 
