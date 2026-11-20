@@ -1,6 +1,6 @@
 import http from "node:http";
 import crypto from "node:crypto";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import {
   randomToken,
   requireEnv,
@@ -132,6 +132,15 @@ const server = http.createServer(async (req, res) => {
       return json(res, 403, { error: "origin_denied" });
     }
 
+    if (req.method === "GET" && ["/", "/styles.css", "/app.js"].includes(req.url)) {
+      const asset = req.url === "/" ? "index.html" : req.url.slice(1);
+      const types = { "index.html": "text/html; charset=utf-8", "styles.css": "text/css; charset=utf-8", "app.js": "text/javascript; charset=utf-8" };
+      const content = await readFile(new URL("../web/" + asset, import.meta.url));
+      securityHeaders(res);
+      res.writeHead(200, { "content-type": types[asset], "cache-control": "no-cache" });
+      return res.end(content);
+    }
+
     if (req.method === "GET" && req.url === "/ready") {
       return json(res, 200, { ok: true, service: "admin", ready: true });
     }
@@ -181,7 +190,22 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "GET" && req.url === "/api/auth/me") {
       const session = requireFounder(req, res);
       if (!session) return;
-      return json(res, 200, { ok: true, user: { username: session.username, role: session.role } });
+      return json(res, 200, { ok: true, user: { username: session.username, role: session.role }, csrfToken: session.csrf });
+    }
+
+    if (req.method === "GET" && req.url === "/api/control/public-status") {
+      const session = requireFounder(req, res);
+      if (!session) return;
+      try {
+        const upstream = await fetch(publicApiUrl + "/api/public/status", {
+          headers: { "x-correlation-id": req.headers["x-correlation-id"] || crypto.randomUUID() }
+        });
+        if (!upstream.ok) return json(res, 502, { error: "public_service_unavailable" });
+        const data = await upstream.json();
+        return json(res, 200, { ok: true, config: data.config });
+      } catch {
+        return json(res, 502, { error: "public_service_unavailable" });
+      }
     }
 
     if (req.method === "POST" && req.url === "/api/control/public-config") {
