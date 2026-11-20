@@ -8,7 +8,8 @@
   "scripts": {
     "dev:admin": "node apps/admin/src/server.js",
     "dev:public": "node apps/public/src/server.js",
-    "check": "node --check apps/admin/src/server.js && node --check apps/public/src/server.js && node --check apps/admin/web/app.js && node --check apps/public/web/app.js && node --check packages/core/src/config.js && node --check packages/core/src/audit.js && node --check packages/core/src/activation-store.js && node --check packages/core/src/public-config-store.js && node --check scripts/audit-integrity-smoke.mjs"
+    "check": "node --check apps/admin/src/server.js && node --check apps/public/src/server.js && node --check apps/admin/web/app.js && node --check apps/public/web/app.js && node --check packages/core/src/config.js && node --check packages/core/src/audit.js && node --check packages/core/src/activation-store.js && node --check packages/core/src/public-config-store.js && node --check scripts/audit-integrity-smoke.mjs",
+    "check:production-config": "node scripts/production-config-smoke.mjs"
   },
   "engines": {
     "node": ">=24"
