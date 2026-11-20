@@ -8,6 +8,7 @@ import {
   timingSafeEqualText
 } from "../../../packages/core/src/config.js";
 import { writeAuditEvent } from "../../../packages/core/src/audit.js";
+import { securityHeaders, assertSafeOrigin } from "./security.js";
 
 const port = Number(process.env.ADMIN_PORT || 3000);
 const adminUser = requireEnv("ADMIN_USERNAME");
@@ -15,12 +16,14 @@ const adminPassword = requireStrongSecret("ADMIN_PASSWORD", 16);
 const sessionSecret = requireStrongSecret("ADMIN_SESSION_SECRET");
 const serviceToken = requireStrongSecret("SERVICE_CONTROL_TOKEN");
 const publicApiUrl = process.env.PUBLIC_API_URL || "http://127.0.0.1:4000";
+const allowedOrigin = process.env.ADMIN_ALLOWED_ORIGIN || "";
 const sessions = new Map();
 const attempts = new Map();
 
 await mkdir("./.data", { recursive: true });
 
 function json(res, status, body, headers = {}) {
+  securityHeaders(res);
   res.writeHead(status, {
     "content-type": "application/json; charset=utf-8",
     "cache-control": "no-store",
@@ -34,7 +37,8 @@ function signSession(token) {
 }
 
 function cookie(name, value, maxAge) {
-  return `${name}=${value}; Max-Age=${maxAge}; Path=/; HttpOnly; SameSite=Strict`;
+  const secure = process.env.NODE_ENV === "production" ? "; Secure" : "";
+  return `${name}=${value}; Max-Age=${maxAge}; Path=/; HttpOnly; SameSite=Strict${secure}`;
 }
 
 function parseCookies(header = "") {
@@ -68,10 +72,8 @@ function rateLimited(req) {
 function sessionFrom(req) {
   const raw = parseCookies(req.headers.cookie).soularab_admin;
   if (!raw) return null;
-
   const [token, signature] = raw.split(".");
   if (!token || !signature || !timingSafeEqualText(signature, signSession(token))) return null;
-
   const session = sessions.get(token);
   if (!session || session.expiresAt < Date.now()) {
     sessions.delete(token);
@@ -102,6 +104,11 @@ async function audit(req, action, result, metadata = {}) {
 
 const server = http.createServer(async (req, res) => {
   try {
+    if (!assertSafeOrigin(req, allowedOrigin)) {
+      await audit(req, "request.origin", "denied");
+      return json(res, 403, { error: "origin_denied" });
+    }
+
     if (req.method === "GET" && req.url === "/health") {
       return json(res, 200, { ok: true, service: "admin" });
     }
@@ -111,16 +118,13 @@ const server = http.createServer(async (req, res) => {
         await audit(req, "auth.login", "rate_limited");
         return json(res, 429, { error: "too_many_attempts" });
       }
-
       const body = await readBody(req);
       const valid = body.username === adminUser &&
         timingSafeEqualText(String(body.password || ""), adminPassword);
-
       if (!valid) {
         await audit(req, "auth.login", "denied");
         return json(res, 401, { error: "invalid_credentials" });
       }
-
       const token = randomToken(48);
       const csrf = randomToken(32);
       sessions.set(token, {
@@ -129,7 +133,6 @@ const server = http.createServer(async (req, res) => {
         csrf,
         expiresAt: Date.now() + 8 * 60 * 60 * 1000
       });
-
       await audit(req, "auth.login", "success");
       return json(res, 200, {
         ok: true,
@@ -145,35 +148,27 @@ const server = http.createServer(async (req, res) => {
       if (!session) return;
       sessions.delete(session.token);
       await audit(req, "auth.logout", "success");
-      return json(res, 200, { ok: true }, {
-        "set-cookie": cookie("soularab_admin", "", 0)
-      });
+      return json(res, 200, { ok: true }, { "set-cookie": cookie("soularab_admin", "", 0) });
     }
 
     if (req.method === "GET" && req.url === "/api/auth/me") {
       const session = requireFounder(req, res);
       if (!session) return;
-      return json(res, 200, {
-        ok: true,
-        user: { username: session.username, role: session.role }
-      });
+      return json(res, 200, { ok: true, user: { username: session.username, role: session.role } });
     }
 
     if (req.method === "POST" && req.url === "/api/control/public-config") {
       const session = requireFounder(req, res);
       if (!session) return;
-
       if (req.headers["x-csrf-token"] !== session.csrf) {
         await audit(req, "control.public-config", "csrf_denied");
         return json(res, 403, { error: "csrf_denied" });
       }
-
       const body = await readBody(req);
       if (!body || typeof body.message !== "string" || body.message.length > 500) {
         await audit(req, "control.public-config", "invalid_input");
         return json(res, 400, { error: "invalid_input" });
       }
-
       const correlationId = req.headers["x-correlation-id"] || crypto.randomUUID();
       const upstream = await fetch(`${publicApiUrl}/internal/config`, {
         method: "POST",
@@ -184,15 +179,10 @@ const server = http.createServer(async (req, res) => {
         },
         body: JSON.stringify({ message: body.message })
       });
-
       if (!upstream.ok) {
-        await audit(req, "control.public-config", "upstream_denied", {
-          status: upstream.status,
-          correlationId
-        });
+        await audit(req, "control.public-config", "upstream_denied", { status: upstream.status, correlationId });
         return json(res, 502, { error: "public_service_unavailable", correlationId });
       }
-
       await audit(req, "control.public-config", "success", { correlationId });
       return json(res, 200, { ok: true, correlationId });
     }
@@ -204,6 +194,4 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(port, () => {
-  console.log(`admin service listening on ${port}`);
-});
+server.listen(port, () => console.log(`admin service listening on ${port}`));
