@@ -30,6 +30,11 @@ async function request(url, options = {}) {
 }
 
 try {
+  const publicPage = await request("http://127.0.0.1:4100/");
+  if (!publicPage.ok || !(await publicPage.text()).includes("SOULARAB")) throw new Error("public interface failed");
+  const adminPage = await request("http://127.0.0.1:3100/");
+  if (!adminPage.ok || !(await adminPage.text()).includes("مركز التحكم")) throw new Error("founder interface failed");
+
   const publicHealth = await request("http://127.0.0.1:4100/health");
   if (!publicHealth.ok) throw new Error("public health failed");
 
@@ -54,6 +59,13 @@ try {
   const cookie = login.headers.get("set-cookie")?.split(";")[0];
   if (!cookie || !data.csrfToken) throw new Error("session material missing");
 
+  const me = await request("http://127.0.0.1:3100/api/auth/me", { headers: { cookie } });
+  const meData = await me.json();
+  if (!me.ok || meData.csrfToken !== data.csrfToken) throw new Error("session restore failed");
+
+  const protectedStatus = await request("http://127.0.0.1:3100/api/control/public-status", { headers: { cookie } });
+  if (!protectedStatus.ok) throw new Error("founder public status read failed");
+
   const control = await request("http://127.0.0.1:3100/api/control/public-config", {
     method: "POST",
     headers: {
@@ -70,6 +82,12 @@ try {
   if (statusData.config.message !== "controlled by founder") {
     throw new Error("public configuration was not updated");
   }
+
+  const logout = await request("http://127.0.0.1:3100/api/auth/logout", {
+    method: "POST",
+    headers: { cookie, "x-csrf-token": data.csrfToken }
+  });
+  if (!logout.ok) throw new Error("logout failed");
 
   console.log("PHASE2_SMOKE_OK");
 } finally {

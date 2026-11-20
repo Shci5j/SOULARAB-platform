@@ -1,4 +1,5 @@
 import http from "node:http";
+import { readFile } from "node:fs/promises";
 import { randomToken, requireStrongSecret, timingSafeEqualText } from "../../../packages/core/src/config.js";
 import { securityHeaders } from "./security.js";
 
@@ -42,6 +43,14 @@ async function readBody(req) {
 const server = http.createServer(async (req, res) => {
   const correlationId = req.headers["x-correlation-id"] || randomToken(12);
   try {
+    if (req.method === "GET" && ["/", "/styles.css", "/app.js"].includes(req.url)) {
+      const asset = req.url === "/" ? "index.html" : req.url.slice(1);
+      const types = { "index.html": "text/html; charset=utf-8", "styles.css": "text/css; charset=utf-8", "app.js": "text/javascript; charset=utf-8" };
+      const content = await readFile(new URL("../web/" + asset, import.meta.url));
+      securityHeaders(res);
+      res.writeHead(200, { "content-type": types[asset], "cache-control": "no-cache" });
+      return res.end(content);
+    }
     if (req.method === "GET" && req.url === "/ready") {
       return json(res, 200, { ok: true, service: "public", ready: true, correlationId });
     }
