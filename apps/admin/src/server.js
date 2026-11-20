@@ -27,8 +27,6 @@ const sessions = new Map();
 const attempts = new Map();
 let sessionWriteQueue = Promise.resolve();
 
-await mkdir("./.data", { recursive: true });
-
 function sessionKey(token) {
   return crypto.createHash("sha256").update(token).digest("hex");
 }
