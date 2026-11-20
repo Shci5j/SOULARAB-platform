@@ -39,8 +39,11 @@ async function persist(current) {
 function mutate(operation) {
   const task = writeQueue.then(async () => {
     const current = await state();
-    const result = await operation(current);
-    await persist(current);
+    const draft = structuredClone(current);
+    const result = await operation(draft);
+    if (result?.error) return result;
+    await persist(draft);
+    statePromise = Promise.resolve(draft);
     return result;
   });
   writeQueue = task.catch(() => {});
