@@ -1,0 +1,16 @@
+{
+  "name": "soularab-platform",
+  "private": true,
+  "version": "0.2.0",
+  "description": "SOULARAB public platform and private founder control plane",
+  "type": "module",
+  "workspaces": ["apps/*", "packages/*"],
+  "scripts": {
+    "dev:admin": "node apps/admin/src/server.js",
+    "dev:public": "node apps/public/src/server.js",
+    "check": "node --check apps/admin/src/server.js && node --check apps/public/src/server.js && node --check packages/core/src/config.js && node --check packages/core/src/audit.js"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
