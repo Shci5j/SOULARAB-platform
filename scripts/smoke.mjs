@@ -8,6 +8,7 @@ import { rm } from "node:fs/promises";
 const activationStore = join(tmpdir(), "soularab-activation-smoke-" + randomUUID() + ".json");
 const sessionStore = join(tmpdir(), "soularab-session-smoke-" + randomUUID() + ".json");
 const configStore = join(tmpdir(), "soularab-config-smoke-" + randomUUID() + ".json");
+const auditStore = join(tmpdir(), "soularab-audit-smoke-" + randomUUID() + ".jsonl");
 
 const env = {
   ...process.env,
@@ -18,7 +19,8 @@ const env = {
   ADMIN_SESSION_SECRET: "phase2-session-secret-01234567890123456789",
   SERVICE_CONTROL_TOKEN: "phase2-service-token-01234567890123456789",
   PUBLIC_API_URL: "http://127.0.0.1:4100",
-  AUDIT_LOG_FILE: "./.data/smoke-audit.log",
+  AUDIT_LOG_FILE: auditStore,
+  AUDIT_LOG_SECRET: "phase2-audit-integrity-secret-01234567890123456789",
   ACTIVATION_STORE_FILE: activationStore,
   SESSION_STORE_FILE: sessionStore,
   PUBLIC_CONFIG_FILE: configStore
@@ -246,4 +248,5 @@ try {
   await rm(activationStore, { force: true });
   await rm(sessionStore, { force: true });
   await rm(configStore, { force: true });
+  await rm(auditStore, { force: true });
 }
