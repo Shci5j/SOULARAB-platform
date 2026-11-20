@@ -1,19 +1,38 @@
 # SOULARAB Platform Architecture
 
-## Phase 1: Foundation
+## Trust zones
 
-The platform is divided into two explicit trust zones:
+1. **Public Platform** — user-facing portal and approved public endpoints in `apps/public`.
+2. **Founder Control Plane** — private login, administration UI, and privileged APIs in `apps/admin`.
+3. **Shared Core** — configuration, token utilities, and audit contracts in `packages/core`.
 
-1. **Public Platform** — user-facing surface.
-2. **Founder Control Plane** — private administration and control surface.
+The founder console talks to the public service through a dedicated server-to-server token. Browser clients never receive that token.
 
-Shared contracts live under `packages/core`. Documentation lives under `docs`.
+## Current request flow
 
-### Security boundary
-The private control plane must remain inaccessible to unauthenticated public traffic. Secrets and credentials must never be committed to this repository.
+- Visitors load the public portal and read the public service status.
+- The founder authenticates to the admin service using environment-configured credentials.
+- The admin service issues a signed HttpOnly/SameSite session and CSRF token.
+- Privileged browser requests are checked for a valid founder session and CSRF token.
+- The admin service calls the public service over the internal control route using the service token.
+- Privileged actions create audit events.
 
-### Phase 2
-Activate authentication, authorization, controlled communication, and runtime management.
+## Security boundary
 
-### Phase 3
-Operate, monitor, harden, and iterate the platform.
+- The admin service must remain behind private network or edge access controls.
+- Public endpoints never expose privileged control operations.
+- Secrets remain outside source control and browser bundles.
+- Optional device, screen, microphone, and location access must never be covert; each capability requires a clear purpose and explicit user action/consent.
+- Device registration, if introduced, must use a random app-scoped identifier rather than IMEI or other hardware identifiers.
+
+## Persistence boundary
+
+Current sessions and public configuration are in memory. Audit events use the configured local audit file. This is suitable only for a single-instance development baseline, not production or multi-instance deployment. A persistent shared store is required before activating authorization workflows.
+
+## Phase 2
+
+Implement persistent state, the authority-permit review process, capped trial enrollment, founder approvals, and user-facing consent controls. Activation must fail closed when a required authority permit or founder approval is missing.
+
+## Phase 3
+
+Deploy, monitor, back up, rotate secrets, scan dependencies, and test recovery only after the production release gate is satisfied.
