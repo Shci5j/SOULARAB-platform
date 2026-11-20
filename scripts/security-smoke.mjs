@@ -73,6 +73,12 @@ try {
   const founderOverviewDenied = await request("http://127.0.0.1:3200/api/control/activation-overview");
   if (founderOverviewDenied.status !== 401) throw new Error("founder activation overview exposed");
 
+  const auditDenied = await request("http://127.0.0.1:3200/api/control/audit-integrity");
+  if (auditDenied.status !== 401) throw new Error("audit integrity endpoint exposed");
+
+  const auditEventsDenied = await request("http://127.0.0.1:3200/api/control/audit-events");
+  if (auditEventsDenied.status !== 401) throw new Error("audit events endpoint exposed");
+
   const deniedOrigin = await request("http://127.0.0.1:3200/api/auth/login", {
     method: "POST",
     headers: { "content-type": "application/json", origin: "https://evil.example" },
