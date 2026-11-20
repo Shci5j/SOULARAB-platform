@@ -89,7 +89,7 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && req.url === "/api/activation/permit-request") {
       const result = await submitPermitRequest(await readBody(req));
       if (result.error) {
-        const status = result.error === "trial_slots_still_available" ? 409 : 400;
+        const status = result.error === "trial_slots_still_available" ? 409 : result.error === "pending_request_limit" ? 429 : 400;
         return json(res, status, { error: result.error, correlationId });
       }
       return json(res, 202, { ok: true, ...result, correlationId });
