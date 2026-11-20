@@ -248,7 +248,7 @@ const server = http.createServer(async (req, res) => {
           "content-type": "application/json",
           authorization: "Bearer " + serviceToken
         },
-        body: JSON.stringify(body)
+        body: JSON.stringify({ ...body, reviewer: session.username })
       });
       const data = await upstream.json().catch(() => ({ error: "activation_service_unavailable" }));
       if (!upstream.ok) {
