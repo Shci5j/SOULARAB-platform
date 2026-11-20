@@ -26,6 +26,25 @@
       <div><p class="eyebrow">01 / الخدمات</p><h2>مساحة واحدة، تجربة أبسط.</h2><p>تُضاف الخدمات تدريجيًا بعد اختبارها والتحقق من جاهزيتها.</p></div>
       <div class="service-card"><span class="service-icon">✦</span><h3>بوابة SOULARAB</h3><p id="service-message">الخدمة الأساسية جاهزة لاستقبال التحديثات.</p><span class="tag">الخدمة الأساسية</span></div>
     </section>
+    <section class="activation" id="activation">
+      <p class="eyebrow">03 / التفعيل التجريبي</p>
+      <h2>تفعيل اختياري وواضح.</h2>
+      <p>النسخة التجريبية محدودة بعشرة معرّفات تثبيت للتطبيق. عند التسجيل يُنشأ معرّف عشوائي خاص بهذا التطبيق فقط؛ لا نقرأ IMEI أو الرقم التسلسلي أو موقعك أو محتوى الشاشة.</p>
+      <p id="activation-policy" class="policy-note">جارٍ تحميل سياسة التفعيل…</p>
+      <label class="consent"><input type="checkbox" id="activation-consent"><span>أوافق على تسجيل معرّف التثبيت العشوائي وإظهار حالة التفعيل لهذا التطبيق. يمكنني إلغاء التسجيل لاحقًا.</span></label>
+      <button class="button primary" id="activate-button" type="button">تسجيل هذا التثبيت</button>
+      <p id="activation-status" class="activation-status" role="status"></p>
+      <form id="permit-form" class="permit-form hidden">
+        <h3>طلب مراجعة تصريح رسمي</h3>
+        <p>بعد اكتمال المقاعد التجريبية، يلزم تصريح من الجهة المختصة ومراجعته يدويًا من المؤسس. لا يؤدي إرسال الطلب إلى تفعيل أي ميزة حساسة.</p>
+        <label for="authority-name">اسم الجهة المصدرة</label><input id="authority-name" maxlength="160" required>
+        <label for="jurisdiction">الدولة أو النطاق القانوني</label><input id="jurisdiction" maxlength="120" required>
+        <label for="permit-reference">رقم أو مرجع التصريح</label><input id="permit-reference" maxlength="120" required>
+        <label for="contact-email">بريد للتواصل بشأن المراجعة</label><input id="contact-email" type="email" maxlength="254" required>
+        <button class="button primary" type="submit">إرسال طلب المراجعة</button>
+      </form>
+      <button class="button secondary hidden" id="revoke-button" type="button">إلغاء تسجيل هذا التثبيت</button>
+    </section>
     <section class="about" id="about"><p class="eyebrow">02 / المبادئ</p><h2>الخصوصية ليست إعدادًا ثانويًا.</h2><p>لا يتم طلب أذونات الجهاز أو الوصول إلى بياناته إلا عند الحاجة، وبموافقة صريحة ومفهومة. يمكنك رفض أي إذن دون أن يُطلب منك تقديمه بصياغة مضللة.</p></section>
   </main>
   <footer><span>© <span id="year"></span> SOULARAB</span><span>نسخة تأسيسية قيد التطوير</span></footer>
