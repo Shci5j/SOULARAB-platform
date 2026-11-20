@@ -21,5 +21,7 @@ jobs:
       - run: node --check packages/core/src/audit.js
       - run: node --check packages/core/src/activation-store.js
       - run: node --check packages/core/src/public-config-store.js
+      - run: node --check scripts/audit-integrity-smoke.mjs
+      - run: node scripts/audit-integrity-smoke.mjs
       - run: node scripts/smoke.mjs
       - run: node scripts/security-smoke.mjs
