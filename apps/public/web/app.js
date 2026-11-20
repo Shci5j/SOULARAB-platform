@@ -73,8 +73,14 @@ $("#activate-button").addEventListener("click",async()=>{
 $("#permit-form").addEventListener("submit",async event=>{
   event.preventDefault();
   if(!installationId){$("#activation-status").textContent="سجّل التثبيت أولًا.";return;}
+  if(!$("#permit-consent").checked){
+    $("#activation-status").textContent="يرجى الموافقة على استخدام بيانات التصريح للمراجعة أولًا.";
+    return;
+  }
   const payload={
     installationId,
+    consent:true,
+    consentVersion,
     authorityName:$("#authority-name").value,
     jurisdiction:$("#jurisdiction").value,
     permitReference:$("#permit-reference").value,
