@@ -29,6 +29,10 @@ function json(res, status, body, headers = {}) {
   res.end(JSON.stringify(body));
 }
 
+function signSession(token) {
+  return crypto.createHmac("sha256", sessionSecret).update(token).digest("base64url");
+}
+
 function cookie(name, value, maxAge) {
   return `${name}=${value}; Max-Age=${maxAge}; Path=/; HttpOnly; SameSite=Strict`;
 }
@@ -48,12 +52,8 @@ async function readBody(req) {
   return raw ? JSON.parse(raw) : {};
 }
 
-function clientKey(req) {
-  return req.socket.remoteAddress || "unknown";
-}
-
 function rateLimited(req) {
-  const key = clientKey(req);
+  const key = req.socket.remoteAddress || "unknown";
   const now = Date.now();
   const list = (attempts.get(key) || []).filter(t => now - t < 60_000);
   if (list.length >= 10) {
@@ -66,8 +66,12 @@ function rateLimited(req) {
 }
 
 function sessionFrom(req) {
-  const token = parseCookies(req.headers.cookie).soularab_admin;
-  if (!token) return null;
+  const raw = parseCookies(req.headers.cookie).soularab_admin;
+  if (!raw) return null;
+
+  const [token, signature] = raw.split(".");
+  if (!token || !signature || !timingSafeEqualText(signature, signSession(token))) return null;
+
   const session = sessions.get(token);
   if (!session || session.expiresAt < Date.now()) {
     sessions.delete(token);
@@ -109,24 +113,30 @@ const server = http.createServer(async (req, res) => {
       }
 
       const body = await readBody(req);
-      const valid = body.username === adminUser && timingSafeEqualText(String(body.password || ""), adminPassword);
+      const valid = body.username === adminUser &&
+        timingSafeEqualText(String(body.password || ""), adminPassword);
+
       if (!valid) {
         await audit(req, "auth.login", "denied");
         return json(res, 401, { error: "invalid_credentials" });
       }
 
       const token = randomToken(48);
+      const csrf = randomToken(32);
       sessions.set(token, {
         username: adminUser,
         role: "founder",
-        csrf: randomToken(32),
+        csrf,
         expiresAt: Date.now() + 8 * 60 * 60 * 1000
       });
 
       await audit(req, "auth.login", "success");
-      const session = sessions.get(token);
-      return json(res, 200, { ok: true, user: { username: adminUser, role: "founder" }, csrfToken: session.csrf }, {
-        "set-cookie": cookie("soularab_admin", token, 8 * 60 * 60)
+      return json(res, 200, {
+        ok: true,
+        user: { username: adminUser, role: "founder" },
+        csrfToken: csrf
+      }, {
+        "set-cookie": cookie("soularab_admin", `${token}.${signSession(token)}`, 8 * 60 * 60)
       });
     }
 
@@ -135,18 +145,24 @@ const server = http.createServer(async (req, res) => {
       if (!session) return;
       sessions.delete(session.token);
       await audit(req, "auth.logout", "success");
-      return json(res, 200, { ok: true }, { "set-cookie": cookie("soularab_admin", "", 0) });
+      return json(res, 200, { ok: true }, {
+        "set-cookie": cookie("soularab_admin", "", 0)
+      });
     }
 
     if (req.method === "GET" && req.url === "/api/auth/me") {
       const session = requireFounder(req, res);
       if (!session) return;
-      return json(res, 200, { ok: true, user: { username: session.username, role: session.role } });
+      return json(res, 200, {
+        ok: true,
+        user: { username: session.username, role: session.role }
+      });
     }
 
     if (req.method === "POST" && req.url === "/api/control/public-config") {
       const session = requireFounder(req, res);
       if (!session) return;
+
       if (req.headers["x-csrf-token"] !== session.csrf) {
         await audit(req, "control.public-config", "csrf_denied");
         return json(res, 403, { error: "csrf_denied" });
@@ -170,7 +186,10 @@ const server = http.createServer(async (req, res) => {
       });
 
       if (!upstream.ok) {
-        await audit(req, "control.public-config", "upstream_denied", { status: upstream.status });
+        await audit(req, "control.public-config", "upstream_denied", {
+          status: upstream.status,
+          correlationId
+        });
         return json(res, 502, { error: "public_service_unavailable", correlationId });
       }
 
