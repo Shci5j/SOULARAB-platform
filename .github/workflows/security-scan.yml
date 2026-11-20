@@ -34,7 +34,7 @@ jobs:
       - name: Build image
         run: docker build -f apps/${{ matrix.service }}/Dockerfile -t soularab/${{ matrix.service }}:scan .
       - name: Scan image
-        uses: aquasecurity/trivy-action@0.33.1
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: soularab/${{ matrix.service }}:scan
           format: table
