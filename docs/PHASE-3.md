@@ -8,8 +8,7 @@
 - Establish a repeatable deployment and rollback workflow.
 
 ## Implemented in the current repository
-- Public and admin health endpoints.
-- Public readiness endpoint; admin readiness endpoint is included in the runtime-hardening change under review.
+- Public and admin health and readiness endpoints.
 - Configurable request, header, and keep-alive timeouts for both services.
 - Bounded request-body buffering with explicit 400/413 responses for malformed or oversized JSON requests.
 - Production Secure session-cookie enforcement.
@@ -17,6 +16,7 @@
 - GitHub Actions workflow configured to run syntax, functional, and security checks.
 - Secret-rotation procedure documented.
 - Audit events include actor, action, target, timestamp, result, and correlation ID.
+- Public and founder web interfaces with same-origin content security policies.
 
 ## Not implemented yet
 - Periodic cleanup of expired in-memory sessions and rate-limit entries. Expired sessions are removed when accessed; rate-limit history is pruned on subsequent login attempts. No background cleanup task is configured.
