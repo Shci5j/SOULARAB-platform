@@ -2,6 +2,7 @@ import http from "node:http";
 import { readFile } from "node:fs/promises";
 import { randomToken, requireStrongSecret, timingSafeEqualText } from "../../../packages/core/src/config.js";
 import { securityHeaders } from "./security.js";
+import { loadPublicConfig, updatePublicConfig } from "../../../packages/core/src/public-config-store.js";
 import {
   enrollInstallation,
   getActivationPolicy,
@@ -15,7 +16,7 @@ import {
 
 const port = Number(process.env.PUBLIC_PORT || 4000);
 const controlToken = requireStrongSecret("SERVICE_CONTROL_TOKEN");
-let publicConfig = { status: "online", message: "SOULARAB public platform" };
+let publicConfig = await loadPublicConfig();
 
 function json(res, status, body, headers = {}) {
   securityHeaders(res);
@@ -132,7 +133,8 @@ const server = http.createServer(async (req, res) => {
       if (!body || typeof body.message !== "string" || body.message.length > 500) {
         return json(res, 400, { error: "invalid_config", correlationId });
       }
-      publicConfig = { status: "online", message: body.message };
+      publicConfig = await updatePublicConfig(body.message);
+      if (publicConfig.error) return json(res, 400, { error: publicConfig.error, correlationId });
       return json(res, 200, { ok: true, correlationId });
     }
     return json(res, 404, { error: "not_found", correlationId });
