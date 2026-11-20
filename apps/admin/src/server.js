@@ -139,21 +139,24 @@ function rateLimited(req) {
   return false;
 }
 
-function sessionFrom(req) {
+async function sessionFrom(req) {
   const raw = parseCookies(req.headers.cookie).soularab_admin;
   if (!raw) return null;
   const [token, signature] = raw.split(".");
   if (!token || !signature || !timingSafeEqualText(signature, signSession(token))) return null;
-  const session = sessions.get(token);
-  if (!session || session.expiresAt < Date.now()) {
-    sessions.delete(token);
+  const key = sessionKey(token);
+  const session = sessions.get(key);
+  if (!session) return null;
+  if (session.expiresAt < Date.now()) {
+    sessions.delete(key);
+    await persistSessions();
     return null;
   }
   return { token, ...session };
 }
 
-function requireFounder(req, res) {
-  const session = sessionFrom(req);
+async function requireFounder(req, res) {
+  const session = await sessionFrom(req);
   if (!session || session.role !== "founder") {
     json(res, 401, { error: "authentication_required" });
     return null;
@@ -162,8 +165,9 @@ function requireFounder(req, res) {
 }
 
 async function audit(req, action, result, metadata = {}) {
+  const session = await sessionFrom(req);
   return writeAuditEvent({
-    actor: sessionFrom(req)?.username || "anonymous",
+    actor: session?.username || "anonymous",
     action,
     target: "admin-control-plane",
     result,
@@ -227,7 +231,7 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (req.method === "POST" && req.url === "/api/auth/logout") {
-      const session = requireFounder(req, res);
+      const session = await requireFounder(req, res);
       if (!session) return;
       if (req.headers["x-csrf-token"] !== session.csrf) {
         await audit(req, "auth.logout", "csrf_denied");
