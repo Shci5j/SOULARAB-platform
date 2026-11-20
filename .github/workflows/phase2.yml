@@ -1,0 +1,20 @@
+name: Phase 2 Verification
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - run: node --check apps/admin/src/server.js
+      - run: node --check apps/public/src/server.js
+      - run: node --check packages/core/src/config.js
+      - run: node --check packages/core/src/audit.js
+      - run: node scripts/smoke.mjs
