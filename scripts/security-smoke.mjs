@@ -1,5 +1,11 @@
 import { spawn } from "node:child_process";
 import { setTimeout as sleep } from "node:timers/promises";
+import { randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { rm } from "node:fs/promises";
+
+const activationStore = join(tmpdir(), "soularab-activation-security-" + randomUUID() + ".json");
 
 const env = {
   ...process.env,
@@ -13,7 +19,8 @@ const env = {
   PUBLIC_API_URL: "http://127.0.0.1:4200",
   ADMIN_ALLOWED_ORIGIN: "https://admin.example.test",
   REQUEST_TIMEOUT_MS: "5000",
-  AUDIT_LOG_FILE: "./.data/security-smoke-audit.log"
+  AUDIT_LOG_FILE: "./.data/security-smoke-audit.log",
+  ACTIVATION_STORE_FILE: activationStore
 };
 
 const children = [
@@ -43,6 +50,22 @@ try {
     if (!r.ok) throw new Error("readiness failed");
     if (r.headers.get("x-content-type-options") !== "nosniff") throw new Error("security header missing");
   }
+
+  const publicActivationPolicy = await request("http://127.0.0.1:4200/api/activation/policy");
+  if (!publicActivationPolicy.ok) throw new Error("activation policy endpoint unavailable");
+
+  const consentDenied = await request("http://127.0.0.1:4200/api/activation/enroll", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ installationId: randomUUID(), consent: false, consentVersion: "2026-01" })
+  });
+  if (consentDenied.status !== 400) throw new Error("activation accepted without explicit consent");
+
+  const internalOverviewDenied = await request("http://127.0.0.1:4200/internal/activation/overview");
+  if (internalOverviewDenied.status !== 401) throw new Error("internal activation overview exposed");
+
+  const founderOverviewDenied = await request("http://127.0.0.1:3200/api/control/activation-overview");
+  if (founderOverviewDenied.status !== 401) throw new Error("founder activation overview exposed");
 
   const deniedOrigin = await request("http://127.0.0.1:3200/api/auth/login", {
     method: "POST",
@@ -91,4 +114,5 @@ try {
   console.log("SECURITY_SMOKE_OK");
 } finally {
   for (const child of children) child.kill("SIGTERM");
+  await rm(activationStore, { force: true });
 }
