@@ -17,6 +17,10 @@ const sessionSecret = requireStrongSecret("ADMIN_SESSION_SECRET");
 const serviceToken = requireStrongSecret("SERVICE_CONTROL_TOKEN");
 const publicApiUrl = process.env.PUBLIC_API_URL || "http://127.0.0.1:4000";
 const allowedOrigin = process.env.ADMIN_ALLOWED_ORIGIN || "";
+const requestTimeoutMs = Number(process.env.REQUEST_TIMEOUT_MS || 10_000);
+if (!Number.isSafeInteger(requestTimeoutMs) || requestTimeoutMs < 1_000) {
+  throw new Error("REQUEST_TIMEOUT_MS must be an integer of at least 1000");
+}
 const sessions = new Map();
 const attempts = new Map();
 
@@ -50,10 +54,29 @@ function parseCookies(header = "") {
 
 async function readBody(req) {
   const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
+  let size = 0;
+  let tooLarge = false;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > 16_384) {
+      tooLarge = true;
+      continue;
+    }
+    if (!tooLarge) chunks.push(chunk);
+  }
+  if (tooLarge) {
+    const error = new Error("request body too large");
+    error.statusCode = 413;
+    throw error;
+  }
   const raw = Buffer.concat(chunks).toString("utf8");
-  if (raw.length > 16_384) throw new Error("request body too large");
-  return raw ? JSON.parse(raw) : {};
+  try {
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    const error = new Error("invalid JSON body");
+    error.statusCode = 400;
+    throw error;
+  }
 }
 
 function rateLimited(req) {
@@ -107,6 +130,10 @@ const server = http.createServer(async (req, res) => {
     if (!assertSafeOrigin(req, allowedOrigin)) {
       await audit(req, "request.origin", "denied");
       return json(res, 403, { error: "origin_denied" });
+    }
+
+    if (req.method === "GET" && req.url === "/ready") {
+      return json(res, 200, { ok: true, service: "admin", ready: true });
     }
 
     if (req.method === "GET" && req.url === "/health") {
@@ -190,8 +217,14 @@ const server = http.createServer(async (req, res) => {
     return json(res, 404, { error: "not_found" });
   } catch (error) {
     await audit(req, "request", "error", { message: error.message });
-    return json(res, 500, { error: "internal_error" });
+    return json(res, error.statusCode || 500, {
+      error: error.statusCode === 413 ? "payload_too_large" :
+        error.statusCode === 400 ? "invalid_request" : "internal_error"
+    });
   }
 });
 
+server.requestTimeout = requestTimeoutMs;
+server.headersTimeout = Math.min(requestTimeoutMs, 10_000);
+server.keepAliveTimeout = Math.min(requestTimeoutMs, 5_000);
 server.listen(port, () => console.log(`admin service listening on ${port}`));

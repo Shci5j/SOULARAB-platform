@@ -14,11 +14,29 @@ function json(res, status, body, headers = {}) {
 
 async function readBody(req) {
   const chunks = [];
-  for await (const chunk of req) chunks.push(chunk);
+  let size = 0;
+  let tooLarge = false;
+  for await (const chunk of req) {
+    size += chunk.length;
+    if (size > 16_384) {
+      tooLarge = true;
+      continue;
+    }
+    if (!tooLarge) chunks.push(chunk);
+  }
+  if (tooLarge) {
+    const error = new Error("request body too large");
+    error.statusCode = 413;
+    throw error;
+  }
   const raw = Buffer.concat(chunks).toString("utf8");
-  if (!raw) return {};
-  if (raw.length > 16_384) throw new Error("request body too large");
-  return JSON.parse(raw);
+  try {
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    const error = new Error("invalid JSON body");
+    error.statusCode = 400;
+    throw error;
+  }
 }
 
 const server = http.createServer(async (req, res) => {
@@ -47,12 +65,20 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, correlationId });
     }
     return json(res, 404, { error: "not_found", correlationId });
-  } catch {
-    return json(res, 500, { error: "internal_error", correlationId });
+  } catch (error) {
+    const status = error.statusCode || 500;
+    return json(res, status, {
+      error: status === 413 ? "payload_too_large" :
+        status === 400 ? "invalid_request" : "internal_error",
+      correlationId
+    });
   }
 });
 
 const requestTimeoutMs = Number(process.env.REQUEST_TIMEOUT_MS || 10_000);
+if (!Number.isSafeInteger(requestTimeoutMs) || requestTimeoutMs < 1_000) {
+  throw new Error("REQUEST_TIMEOUT_MS must be an integer of at least 1000");
+}
 server.requestTimeout = requestTimeoutMs;
 server.headersTimeout = Math.min(requestTimeoutMs, 10_000);
 server.keepAliveTimeout = Math.min(requestTimeoutMs, 5_000);
