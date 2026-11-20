@@ -27,7 +27,7 @@ The founder console talks to the public service through a dedicated server-to-se
 
 ## Persistence boundary
 
-Founder sessions are persisted locally in a JSON file using hashed session-token keys and server-side revocation. Public configuration remains in memory, while activation records use a separate local JSON file. Audit events use the configured local audit file. These file-backed stores are single-instance development baselines, not production or multi-instance storage. A production-grade shared store is required before deployment.
+Founder sessions are persisted locally in a JSON file using hashed session-token keys and server-side revocation. Public configuration and activation records use separate local JSON files. Audit events use the configured local audit file. These file-backed stores are single-instance development baselines, not production or multi-instance storage. A production-grade shared store is required before deployment.
 
 ## Phase 2
 
