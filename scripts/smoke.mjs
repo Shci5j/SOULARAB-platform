@@ -74,6 +74,21 @@ try {
   });
   if (capped.status !== 409) throw new Error("10-installation trial cap failed");
 
+  const permitConsentDenied = await request("http://127.0.0.1:4100/api/activation/permit-request", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({
+      installationId: extraInstallationId,
+      authorityName: "Example Competent Authority",
+      jurisdiction: "Test jurisdiction",
+      permitReference: "TEST-PERMIT-001",
+      contactEmail: "review@example.test",
+      consent: false,
+      consentVersion: "2026-01"
+    })
+  });
+  if (permitConsentDenied.status !== 400) throw new Error("permit data accepted without consent");
+
   const permitRequest = await request("http://127.0.0.1:4100/api/activation/permit-request", {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -82,7 +97,9 @@ try {
       authorityName: "Example Competent Authority",
       jurisdiction: "Test jurisdiction",
       permitReference: "TEST-PERMIT-001",
-      contactEmail: "review@example.test"
+      contactEmail: "review@example.test",
+      consent: true,
+      consentVersion: "2026-01"
     })
   });
   const permitData = await permitRequest.json();
