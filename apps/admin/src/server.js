@@ -182,6 +182,10 @@ const server = http.createServer(async (req, res) => {
     if (req.method === "POST" && req.url === "/api/auth/logout") {
       const session = requireFounder(req, res);
       if (!session) return;
+      if (req.headers["x-csrf-token"] !== session.csrf) {
+        await audit(req, "auth.logout", "csrf_denied");
+        return json(res, 403, { error: "csrf_denied" });
+      }
       sessions.delete(session.token);
       await audit(req, "auth.logout", "success");
       return json(res, 200, { ok: true }, { "set-cookie": cookie("soularab_admin", "", 0) });
