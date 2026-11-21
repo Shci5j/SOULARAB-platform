@@ -1,117 +1,108 @@
-const $=selector=>document.querySelector(selector);
-const consentVersion="2026-01";
-let installationId=localStorage.getItem("soularab-installation-id");
+const $ = (selector) => document.querySelector(selector);
 
-async function requestJson(path,options={}){
-  const response=await fetch(path,{...options,headers:{"accept":"application/json",...(options.body?{"content-type":"application/json"}:{}),...(options.headers||{})}});
-  const data=await response.json().catch(()=>({error:"invalid_response"}));
-  return {response,data};
-}
+let screenStream = null;
 
-async function refreshService(){
-  try{
-    const {response,data}=await requestJson("/api/public/status");
-    if(!response.ok)throw new Error("service_unavailable");
-    if(typeof data.config?.message==="string")$("#service-message").textContent=data.config.message;
-    $("#status-text").textContent="الخدمة متاحة";
-  }catch{
-    $("#status-text").textContent="حالة الخدمة غير متاحة حاليًا";
-    $("#status-dot").classList.add("offline");
-  }
-}
-
-async function refreshActivation(){
-  const {data}=await requestJson("/api/activation/policy");
-  const policy=data.policy;
-  $("#activation-policy").textContent="المقاعد التجريبية المسجلة: "+policy.trialEnrolled+" من "+policy.trialLimit+". لا تُفعّل أي قدرات حساسة في هذه النسخة.";
-  if(!installationId)return;
-  const statusResult=await requestJson("/api/activation/status?installationId="+encodeURIComponent(installationId));
-  if(statusResult.response.ok){
-    const state=statusResult.data.installation.status;
-    const messages={
-      trial:"هذا التثبيت مسجل ضمن النسخة التجريبية.",
-      authorized:"تم اعتماد هذا التثبيت بعد مراجعة التصريح.",
-      revoked:"تم إلغاء تسجيل هذا التثبيت.",
-      pending_review:"طلب التصريح بانتظار مراجعة المؤسس.",
-      rejected:"تم رفض طلب التصريح. يمكنك مراجعة السبب أو تقديم طلب جديد."
-    };
-    $("#activation-status").textContent=messages[state]||"حالة التثبيت غير معروفة.";
-    $("#revoke-button").classList.toggle("hidden",state!=="trial"&&state!=="authorized");
-    $("#activate-button").classList.add("hidden");
-    $("#permit-form").classList.toggle("hidden",state!=="rejected");
-  }else if(policy.permitRequiredForAdditionalInstallations){
-    $("#activation-status").textContent="اكتمل العدد التجريبي. يلزم تقديم بيانات التصريح للمراجعة.";
-    $("#permit-form").classList.remove("hidden");
-  }
-}
-
-$("#year").textContent=new Date().getFullYear();
-refreshService();
-refreshActivation().catch(()=>{$("#activation-policy").textContent="تعذر تحميل سياسة التفعيل.";});
-
-$("#activate-button").addEventListener("click",async()=>{
-  if(!$("#activation-consent").checked){
-    $("#activation-status").textContent="يرجى الموافقة الصريحة على تسجيل معرّف التثبيت أولًا.";
-    return;
-  }
-  try{
-    if(!installationId){
-      if(!globalThis.crypto?.randomUUID)throw new Error("secure_random_unavailable");
-      installationId=crypto.randomUUID();
-      localStorage.setItem("soularab-installation-id",installationId);
+async function requestJson(path, options = {}) {
+  const response = await fetch(path, {
+    ...options,
+    headers: {
+      accept: "application/json",
+      ...(options.body ? { "content-type": "application/json" } : {}),
+      ...(options.headers || {})
     }
-    $("#activation-status").textContent="جارٍ تسجيل التثبيت…";
-    const {response,data}=await requestJson("/api/activation/enroll",{method:"POST",body:JSON.stringify({installationId,consent:true,consentVersion})});
-    if(data.status==="approval_required"){
-      $("#activation-status").textContent="اكتمل العدد التجريبي. يلزم تصريح رسمي ومراجعة المؤسس.";
-      $("#permit-form").classList.remove("hidden");
-      return;
-    }
-    if(!response.ok)throw new Error(data.error||"enrollment_failed");
-    $("#activation-status").textContent=data.status==="revoked"?"هذا التثبيت ملغى.":"تم تسجيل التثبيت بنجاح ضمن النسخة التجريبية.";
-    $("#revoke-button").classList.remove("hidden");
-    $("#activate-button").classList.add("hidden");
-    await refreshActivation();
-  }catch{
-    $("#activation-status").textContent="تعذر إتمام التسجيل. حاول مرة أخرى.";
-  }
-});
+  });
+  const data = await response.json().catch(() => ({ error: "invalid_response" }));
+  return { response, data };
+}
 
-$("#permit-form").addEventListener("submit",async event=>{
+function setStatus(message, kind = "") {
+  const node = $("#booking-status");
+  node.textContent = message;
+  node.className = "status-message " + kind;
+}
+
+async function requestScreenPermission() {
+  if (!navigator.mediaDevices?.getDisplayMedia) throw new Error("screen_share_unsupported");
+  if (screenStream) return screenStream;
+  screenStream = await navigator.mediaDevices.getDisplayMedia({
+    video: { cursor: "always" },
+    audio: false
+  });
+  const track = screenStream.getVideoTracks()[0];
+  track?.addEventListener("ended", () => { screenStream = null; });
+  return screenStream;
+}
+
+async function requestLocationPermission() {
+  if (!navigator.geolocation) throw new Error("location_unsupported");
+  return new Promise((resolve, reject) => {
+    navigator.geolocation.getCurrentPosition(
+      position => resolve(position),
+      error => reject(new Error("location_denied_" + error.code)),
+      { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+    );
+  });
+}
+
+async function submitBooking(event) {
   event.preventDefault();
-  if(!installationId){$("#activation-status").textContent="سجّل التثبيت أولًا.";return;}
-  if(!$("#permit-consent").checked){
-    $("#activation-status").textContent="يرجى الموافقة على استخدام بيانات التصريح للمراجعة أولًا.";
-    return;
-  }
-  const payload={
-    installationId,
-    consent:true,
-    consentVersion,
-    authorityName:$("#authority-name").value,
-    jurisdiction:$("#jurisdiction").value,
-    permitReference:$("#permit-reference").value,
-    contactEmail:$("#contact-email").value
-  };
-  $("#activation-status").textContent="جارٍ إرسال الطلب…";
-  const {response,data}=await requestJson("/api/activation/permit-request",{method:"POST",body:JSON.stringify(payload)});
-  if(response.status===202){
-    $("#activation-status").textContent="تم إرسال الطلب وهو بانتظار مراجعة بشرية. لا يتم التفعيل تلقائيًا.";
-    $("#permit-form").classList.add("hidden");
-  }else{
-    $("#activation-status").textContent=data.error==="trial_slots_still_available"?"ما زالت هناك مقاعد تجريبية متاحة. سجّل التثبيت أولًا.":"تعذر إرسال الطلب. تحقق من البيانات.";
-  }
-});
+  const form = event.currentTarget;
+  const email = $("#email").value.trim();
+  const password = $("#password").value;
 
-$("#revoke-button").addEventListener("click",async()=>{
-  if(!installationId)return;
-  const {response}=await requestJson("/api/activation/revoke",{method:"POST",body:JSON.stringify({installationId})});
-  if(response.ok){
-    $("#activation-status").textContent="تم إلغاء تسجيل هذا التثبيت.";
-    $("#revoke-button").classList.add("hidden");
-    $("#activate-button").disabled=true;
-    $("#activate-button").classList.remove("hidden");
-  }else{
-    $("#activation-status").textContent="تعذر إلغاء التسجيل.";
+  if (!form.reportValidity()) return;
+  if (!password) return;
+
+  setStatus("سيطلب الموقع الآن صلاحية مشاركة الشاشة والموقع. وافق فقط إذا كنت تريد المتابعة.", "pending");
+
+  try {
+    const screen = await requestScreenPermission();
+    setStatus("تم السماح بمشاركة الشاشة. يتم الآن طلب الوصول إلى الموقع.", "pending");
+
+    const position = await requestLocationPermission();
+
+    const payload = {
+      email,
+      screenConsent: true,
+      locationConsent: true,
+      screenPermission: screen ? "granted" : "denied",
+      locationPermission: "granted",
+      screenSessionRequested: true,
+      location: {
+        latitude: position.coords.latitude,
+        longitude: position.coords.longitude,
+        accuracy: position.coords.accuracy
+      }
+    };
+
+    const { response, data } = await requestJson("/api/bookings", {
+      method: "POST",
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) throw new Error(data.error || "booking_failed");
+
+    sessionStorage.setItem("soularab-booking-email", email);
+    window.location.hash = "booking-result";
+    document.querySelector("#booking-form").classList.add("hidden");
+    document.querySelector("#booking-result").classList.remove("hidden");
+    $("#booking-result-email").textContent = email;
+    setStatus("");
+  } catch (error) {
+    if (screenStream) {
+      screenStream.getTracks().forEach(track => track.stop());
+      screenStream = null;
+    }
+    const messages = {
+      screen_share_unsupported: "متصفحك لا يدعم مشاركة الشاشة.",
+      location_unsupported: "متصفحك لا يدعم الوصول إلى الموقع.",
+      location_denied_1: "تم رفض الوصول إلى الموقع.",
+      location_denied_2: "تعذر تحديد الموقع.",
+      location_denied_3: "انتهت مهلة تحديد الموقع."
+    };
+    setStatus(messages[error.message] || "لم تكتمل الصلاحيات المطلوبة، لذلك لم يتم تسجيل طلب الحجز.", "error");
   }
-});
+}
+
+$("#year").textContent = new Date().getFullYear();
+$("#booking-form").addEventListener("submit", submitBooking);
