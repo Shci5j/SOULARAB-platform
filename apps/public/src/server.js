@@ -67,7 +67,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === "POST" && req.url === "/api/screen-sessions") {
       const body=await readBody(req);
-      if(typeof body.bookingId!=="string"||body.bookingId.length<8||typeof body.sessionSecret!=="string") {
+      if(typeof body.bookingId!=="string"||body.bookingId.length<8) {
         return json(res,400,{error:"invalid_session"});
       }
       const session=await createScreenSession(body.bookingId);
