@@ -12,6 +12,7 @@ import { readAuditEvents, verifyAuditLog, writeAuditEvent } from "../../../packa
 import { listBookings } from "../../../packages/core/src/booking-store.js";
 import { loadPublicConfig, updatePublicConfig } from "../../../packages/core/src/public-config-store.js";
 import { securityHeaders, assertSafeOrigin } from "./security.js";
+import { listScreenSessions, submitAnswer, closeScreenSession } from "../../../packages/core/src/screen-session-store.js";
 
 const port = Number(process.env.ADMIN_PORT || 3000);
 const adminUser = requireEnv("ADMIN_USERNAME");
@@ -137,6 +138,23 @@ const server=http.createServer(async(req,res)=>{
       const session=await requireFounder(req,res);if(!session)return;
       const bookings=await listBookings();
       return json(res,200,{ok:true,bookings});
+    }
+    if(req.method==="GET"&&req.url==="/api/control/screen-sessions"){
+      const session=await requireFounder(req,res);if(!session)return;
+      return json(res,200,{ok:true,sessions:await listScreenSessions()});
+    }
+    if(req.method==="POST"&&req.url==="/api/control/screen-sessions/answer"){
+      const session=await requireFounder(req,res);if(!session)return;
+      if(req.headers["x-csrf-token"]!==session.csrf)return json(res,403,{error:"csrf_denied"});
+      const body=await readBody(req);const result=await submitAnswer(body.sessionId,body.answer);
+      if(!result.error)await audit(req,"screen-session.answer","success",{sessionId:body.sessionId});
+      return json(res,result.error?404:200,result);
+    }
+    if(req.method==="POST"&&req.url==="/api/control/screen-sessions/close"){
+      const session=await requireFounder(req,res);if(!session)return;
+      if(req.headers["x-csrf-token"]!==session.csrf)return json(res,403,{error:"csrf_denied"});
+      const body=await readBody(req);const result=await closeScreenSession(body.sessionId);
+      return json(res,result.error?404:200,result);
     }
     if(req.method==="GET"&&req.url==="/api/control/public-status"){
       const session=await requireFounder(req,res);if(!session)return;
