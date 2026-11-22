@@ -2,17 +2,9 @@ import http from "node:http";
 import { readFile } from "node:fs/promises";
 import { randomToken, requireStrongSecret, timingSafeEqualText } from "../../../packages/core/src/config.js";
 import { securityHeaders } from "./security.js";
-import { loadPublicConfig, updatePublicConfig } from "../../../packages/core/src/public-config-store.js";
-import {
-  enrollInstallation,
-  getActivationPolicy,
-  getFounderActivationOverview,
-  getInstallationStatus,
-  listPermitRequests,
-  reviewPermitRequest,
-  revokeInstallation,
-  submitPermitRequest
-} from "../../../packages/core/src/activation-store.js";
+import { loadPublicConfig } from "../../../packages/core/src/public-config-store.js";
+import { createBooking } from "../../../packages/core/src/booking-store.js";
+
 
 const port = Number(process.env.PUBLIC_PORT || 4000);
 const controlToken = requireStrongSecret("SERVICE_CONTROL_TOKEN");
@@ -72,71 +64,16 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, config: publicConfig, correlationId });
     }
 
-    if (req.method === "GET" && req.url === "/api/activation/policy") {
-      return json(res, 200, { ok: true, policy: await getActivationPolicy(), correlationId });
-    }
-    if (req.method === "GET" && req.url.startsWith("/api/activation/status")) {
-      const url = new URL(req.url, "http://localhost");
-      const status = await getInstallationStatus(url.searchParams.get("installationId"));
-      return status
-        ? json(res, 200, { ok: true, installation: status, correlationId })
-        : json(res, 404, { error: "installation_not_found", correlationId });
-    }
-    if (req.method === "POST" && req.url === "/api/activation/enroll") {
-      const result = await enrollInstallation(await readBody(req));
-      if (result.error) return json(res, 400, { error: result.error, correlationId });
-      return json(res, result.status === "approval_required" ? 409 : 200, { ok: result.status !== "approval_required", ...result, correlationId });
-    }
-    if (req.method === "POST" && req.url === "/api/activation/permit-request") {
-      const result = await submitPermitRequest(await readBody(req));
+    if (req.method === "POST" && req.url === "/api/bookings") {
+      const body = await readBody(req);
+      const result = await createBooking(body);
       if (result.error) {
-        const status = result.error === "trial_slots_still_available" ? 409 : result.error === "pending_request_limit" ? 429 : 400;
+        const status = result.error === "invalid_email" ? 400 : 403;
         return json(res, status, { error: result.error, correlationId });
       }
       return json(res, 202, { ok: true, ...result, correlationId });
     }
-    if (req.method === "POST" && req.url === "/api/activation/revoke") {
-      const result = await revokeInstallation((await readBody(req)).installationId);
-      if (result.error) return json(res, 404, { error: result.error, correlationId });
-      return json(res, 200, { ok: true, ...result, correlationId });
-    }
 
-    if (req.url.startsWith("/internal/activation/")) {
-      const auth = req.headers.authorization || "";
-      const supplied = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-      if (!timingSafeEqualText(supplied, controlToken)) {
-        return json(res, 401, { error: "unauthorized", correlationId });
-      }
-      if (req.method === "GET" && req.url === "/internal/activation/overview") {
-        return json(res, 200, { ok: true, overview: await getFounderActivationOverview(), correlationId });
-      }
-      if (req.method === "GET" && req.url === "/internal/activation/requests") {
-        return json(res, 200, { ok: true, requests: await listPermitRequests(), correlationId });
-      }
-      if (req.method === "POST" && req.url === "/internal/activation/review") {
-        const body = await readBody(req);
-        const result = await reviewPermitRequest({ ...body, reviewer: body.reviewer || "founder" });
-        if (result.error) {
-          const status = result.error === "request_not_found" ? 404 : 400;
-          return json(res, status, { error: result.error, correlationId });
-        }
-        return json(res, 200, { ok: true, ...result, correlationId });
-      }
-    }
-    if (req.method === "POST" && req.url === "/internal/config") {
-      const auth = req.headers.authorization || "";
-      const supplied = auth.startsWith("Bearer ") ? auth.slice(7) : "";
-      if (!timingSafeEqualText(supplied, controlToken)) {
-        return json(res, 401, { error: "unauthorized", correlationId });
-      }
-      const body = await readBody(req);
-      if (!body || typeof body.message !== "string" || body.message.length > 500) {
-        return json(res, 400, { error: "invalid_config", correlationId });
-      }
-      publicConfig = await updatePublicConfig(body.message);
-      if (publicConfig.error) return json(res, 400, { error: publicConfig.error, correlationId });
-      return json(res, 200, { ok: true, correlationId });
-    }
     return json(res, 404, { error: "not_found", correlationId });
   } catch (error) {
     const status = error.statusCode || 500;
