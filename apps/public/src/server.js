@@ -8,7 +8,7 @@ import { createScreenSession, submitOffer, waitForAnswer, closeScreenSession } f
 
 
 const port = Number(process.env.PUBLIC_PORT || 4000);
-let publicConfig = await loadPublicConfig();
+
 
 function json(res, status, body, headers = {}) {
   securityHeaders(res);
@@ -63,7 +63,7 @@ const server = http.createServer(async (req, res) => {
       return json(res, 200, { ok: true, service: "public", correlationId });
     }
     if (req.method === "GET" && req.url === "/api/public/status") {
-      return json(res, 200, { ok: true, config: publicConfig, correlationId });
+      return json(res, 200, { ok: true, config: await loadPublicConfig(), correlationId });
     }
 
     if (req.method === "POST" && req.url === "/api/screen-sessions") {
