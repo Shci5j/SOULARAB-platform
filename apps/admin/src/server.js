@@ -121,7 +121,7 @@ const server=http.createServer(async(req,res)=>{
       const token=randomToken(48),csrf=randomToken(32);
       const credentials=await getAdminCredentials(); sessions.set(sessionKey(token),{username:credentials.username,role:"founder",csrf,expiresAt:Date.now()+8*60*60*1000});
       try{await persistSessions();await audit(req,"auth.login","success");}catch(error){sessions.delete(sessionKey(token));await persistSessions();throw error;}
-      return json(res,200,{ok:true,user:{username:adminUser,role:"founder"},csrfToken:csrf},{"set-cookie":cookie("soularab_admin",`${token}.${signSession(token)}`,8*60*60)});
+      return json(res,200,{ok:true,user:{username:credentials.username,role:"founder"},csrfToken:csrf},{"set-cookie":cookie("soularab_admin",`${token}.${signSession(token)}`,8*60*60)});
     }
     if(req.method==="POST"&&req.url==="/api/auth/logout"){
       const session=await requireFounder(req,res);if(!session)return;
