@@ -81,9 +81,9 @@ const server = http.createServer(async (req, res) => {
       const result=await submitOffer(body.sessionId,body.sessionSecret,body.offer);
       return json(res,result.error?404:200,result);
     }
-    if (req.method === "GET" && req.url.startsWith("/api/screen-sessions/answer")) {
-      const u=new URL(req.url,"http://localhost");
-      const result=await waitForAnswer(u.searchParams.get("sessionId"),u.searchParams.get("sessionSecret"));
+    if (req.method === "POST" && req.url === "/api/screen-sessions/answer") {
+      const body=await readBody(req);
+      const result=await waitForAnswer(body.sessionId,body.sessionSecret);
       return json(res,result.error?404:200,result);
     }
     if (req.method === "POST" && req.url === "/api/screen-sessions/close") {
