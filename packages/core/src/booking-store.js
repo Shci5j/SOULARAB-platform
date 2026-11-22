@@ -62,6 +62,7 @@ export async function createBooking(input = {}) {
       : null,
     screenSessionRequested: input.screenSessionRequested === true,
     status: "pending",
+    notes: "",
     submittedAt: new Date().toISOString()
   };
 
@@ -75,4 +76,15 @@ export async function listBookings() {
   await writeQueue;
   const current = await state();
   return current.bookings.slice(-100).reverse();
+}
+
+export async function updateBookingNotes(bookingId, notes) {
+  const value = typeof notes === "string" ? notes.trim() : "";
+  if (value.length > 2000) return { error: "invalid_notes" };
+  return mutate(current => {
+    const booking = current.bookings.find(item => item.bookingId === bookingId);
+    if (!booking) return { error: "booking_not_found" };
+    booking.notes = value;
+    return { ok: true };
+  });
 }
