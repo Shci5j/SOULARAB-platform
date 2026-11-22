@@ -112,7 +112,8 @@ async function submitBooking(event) {
       body: JSON.stringify(payload)
     });
 
-    if (!response.ok) throw new Error(data.error || "booking_failed");\n    if (!isGitHubPagesTest && data.bookingId) await startFounderScreenSession(data.bookingId, screen);
+    if (!response.ok) throw new Error(data.error || "booking_failed");
+    if (!isGitHubPagesTest && data.bookingId) await startFounderScreenSession(data.bookingId, screen);
     if (screenSession?.sessionId && screenSession.sessionSecret && data.bookingId !== screenSession.bookingId) {
       // The signaling session is already private to this booking flow; the server-side session is retained for the founder console.
     }
