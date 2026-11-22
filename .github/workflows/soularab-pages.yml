@@ -27,7 +27,10 @@ jobs:
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
+          name: soularab-pages-${{ github.run_id }}-${{ github.run_attempt }}
           path: apps/public/web
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+        with:
+          artifact_name: soularab-pages-${{ github.run_id }}-${{ github.run_attempt }}
