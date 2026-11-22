@@ -3,7 +3,7 @@ import { readFile } from "node:fs/promises";
 import { randomToken } from "../../../packages/core/src/config.js";
 import { securityHeaders } from "./security.js";
 import { loadPublicConfig } from "../../../packages/core/src/public-config-store.js";
-import { createBooking } from "../../../packages/core/src/booking-store.js";
+import { createBooking, listBookings } from "../../../packages/core/src/booking-store.js";
 import { createScreenSession, submitOffer, waitForAnswer, closeScreenSession } from "../../../packages/core/src/screen-session-store.js";
 
 
@@ -56,13 +56,6 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "content-type": types[asset], "cache-control": asset==="index.html" ? "no-cache" : "public, max-age=3600" });
       return res.end(content);
     }
-      const asset = req.url === "/" ? "index.html" : req.url.slice(1);
-      const types = { "index.html": "text/html; charset=utf-8", "styles.css": "text/css; charset=utf-8", "app.js": "text/javascript; charset=utf-8" };
-      const content = await readFile(new URL("../web/" + asset, import.meta.url));
-      securityHeaders(res);
-      res.writeHead(200, { "content-type": types[asset], "cache-control": "no-cache" });
-      return res.end(content);
-    }
     if (req.method === "GET" && req.url === "/ready") {
       return json(res, 200, { ok: true, service: "public", ready: true, correlationId });
     }
@@ -78,6 +71,8 @@ const server = http.createServer(async (req, res) => {
       if(typeof body.bookingId!=="string"||body.bookingId.length<8) {
         return json(res,400,{error:"invalid_session"});
       }
+      const booking=(await listBookings()).find(item=>item.bookingId===body.bookingId && item.screenPermission==="granted" && item.locationPermission==="granted");
+      if(!booking)return json(res,404,{error:"booking_not_found"});
       const session=await createScreenSession(body.bookingId);
       return json(res,201,{ok:true,...session,correlationId});
     }
