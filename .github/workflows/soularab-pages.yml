@@ -3,6 +3,7 @@ name: Publish Suolarab Money
 on:
   push:
     branches:
+      - main
       - feat/soularab-money-foundation
   workflow_dispatch:
 
