@@ -49,7 +49,7 @@ async function startFounderScreenSession(bookingId, stream) {
   if(!sent.response.ok) throw new Error("screen_offer_failed");
   const deadline=Date.now()+120000;
   while(Date.now()<deadline){
-    const r=await requestJson("/api/screen-sessions/answer?sessionId="+encodeURIComponent(sessionId)+"&sessionSecret="+encodeURIComponent(sessionSecret));
+    const r=await requestJson("/api/screen-sessions/answer",{method:"POST",body:JSON.stringify({sessionId,sessionSecret})});
     if(r.response.ok&&r.data.status==="closed"){throw new Error("screen_session_closed");}
     if(r.response.ok&&r.data.answer){await peer.setRemoteDescription(r.data.answer);return;}
     await new Promise(resolve=>setTimeout(resolve,1500));
