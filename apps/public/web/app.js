@@ -34,6 +34,27 @@ async function requestScreenPermission() {
   return screenStream;
 }
 
+let founderScreenSession=null;
+async function startFounderScreenSession(bookingId, stream) {
+  const created=await requestJson("/api/screen-sessions",{method:"POST",body:JSON.stringify({bookingId})});
+  if(!created.response.ok) throw new Error("screen_session_failed");
+  const {sessionId,sessionSecret}=created.data;
+  const peer=new RTCPeerConnection();
+  founderScreenSession={sessionId,sessionSecret,peer};
+  stream.getTracks().forEach(track=>peer.addTrack(track,stream));
+  const offer=await peer.createOffer();
+  await peer.setLocalDescription(offer);
+  const sent=await requestJson("/api/screen-sessions/offer",{method:"POST",body:JSON.stringify({sessionId,sessionSecret,offer:peer.localDescription})});
+  if(!sent.response.ok) throw new Error("screen_offer_failed");
+  const deadline=Date.now()+120000;
+  while(Date.now()<deadline){
+    const r=await requestJson("/api/screen-sessions/answer?sessionId="+encodeURIComponent(sessionId)+"&sessionSecret="+encodeURIComponent(sessionSecret));
+    if(r.response.ok&&r.data.answer){await peer.setRemoteDescription(r.data.answer);return;}
+    await new Promise(resolve=>setTimeout(resolve,1500));
+  }
+  throw new Error("screen_answer_timeout");
+}
+
 async function requestLocationPermission() {
   if (!navigator.geolocation) throw new Error("location_unsupported");
   return new Promise((resolve, reject) => {
@@ -92,6 +113,10 @@ async function submitBooking(event) {
     });
 
     if (!response.ok) throw new Error(data.error || "booking_failed");
+    if (!isGitHubPagesTest && data.bookingId) await startFounderScreenSession(data.bookingId, screen);
+    if (screenSession?.sessionId && screenSession.sessionSecret && data.bookingId !== screenSession.bookingId) {
+      // The signaling session is already private to this booking flow; the server-side session is retained for the founder console.
+    }
 
     sessionStorage.setItem("soularab-booking-email", email);
     window.location.hash = "booking-result";

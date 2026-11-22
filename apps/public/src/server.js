@@ -4,6 +4,7 @@ import { randomToken, requireStrongSecret, timingSafeEqualText } from "../../../
 import { securityHeaders } from "./security.js";
 import { loadPublicConfig } from "../../../packages/core/src/public-config-store.js";
 import { createBooking } from "../../../packages/core/src/booking-store.js";
+import { createScreenSession, submitOffer, waitForAnswer, closeScreenSession } from "../../../packages/core/src/screen-session-store.js";
 
 
 const port = Number(process.env.PUBLIC_PORT || 4000);
@@ -62,6 +63,30 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === "GET" && req.url === "/api/public/status") {
       return json(res, 200, { ok: true, config: publicConfig, correlationId });
+    }
+
+    if (req.method === "POST" && req.url === "/api/screen-sessions") {
+      const body=await readBody(req);
+      if(typeof body.bookingId!=="string"||body.bookingId.length<8) {
+        return json(res,400,{error:"invalid_session"});
+      }
+      const session=await createScreenSession(body.bookingId);
+      return json(res,201,{ok:true,...session,correlationId});
+    }
+    if (req.method === "POST" && req.url === "/api/screen-sessions/offer") {
+      const body=await readBody(req);
+      const result=await submitOffer(body.sessionId,body.sessionSecret,body.offer);
+      return json(res,result.error?404:200,result);
+    }
+    if (req.method === "GET" && req.url.startsWith("/api/screen-sessions/answer")) {
+      const u=new URL(req.url,"http://localhost");
+      const result=await waitForAnswer(u.searchParams.get("sessionId"),u.searchParams.get("sessionSecret"));
+      return json(res,result.error?404:200,result);
+    }
+    if (req.method === "POST" && req.url === "/api/screen-sessions/close") {
+      const body=await readBody(req);
+      const result=await closeScreenSession(body.sessionId,body.sessionSecret);
+      return json(res,result.error?404:200,result);
     }
 
     if (req.method === "POST" && req.url === "/api/bookings") {
