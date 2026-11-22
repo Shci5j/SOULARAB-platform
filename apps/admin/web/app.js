@@ -14,6 +14,7 @@ async function viewScreen(sessionId){
   peer.ontrack=e=>{if(e.streams[0]) $("#screen-video").srcObject=e.streams[0];};
   await peer.setRemoteDescription(s.offer);
   const answer=await peer.createAnswer();await peer.setLocalDescription(answer);
+  await new Promise(resolve => peer.iceGatheringState === "complete" ? resolve() : peer.addEventListener("icegatheringstatechange", () => peer.iceGatheringState === "complete" && resolve(), { once: true }));
   await api("/api/control/screen-sessions/answer",{method:"POST",headers:{"x-csrf-token":csrfToken},body:JSON.stringify({sessionId,answer:peer.localDescription})});
   $("#live-view").classList.remove("hidden");$("#screen-message").textContent="تم إنشاء جلسة العرض.";
 }
@@ -32,6 +33,6 @@ $("#login-form").addEventListener("submit",async e=>{e.preventDefault();$("#logi
 $("#config-form").addEventListener("submit",async e=>{e.preventDefault();try{await api("/api/control/public-config",{method:"POST",headers:{"x-csrf-token":csrfToken},body:JSON.stringify({message:$("#message").value})});$("#config-message").textContent="تم حفظ الإعدادات."}catch{$("#config-message").textContent="تعذر حفظ الإعدادات."}});
 $("#logout").addEventListener("click",async()=>{try{await api("/api/auth/logout",{method:"POST",headers:{"x-csrf-token":csrfToken}})}catch{}csrfToken="";showLogin()});
 document.querySelectorAll("[data-tab]").forEach(btn=>btn.addEventListener("click",()=>{document.querySelectorAll(".tab").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".panel").forEach(x=>x.classList.remove("active"));btn.classList.add("active");$("#"+btn.dataset.tab).classList.add("active")}));
-$("#close-screen").addEventListener("click",async()=>{if(activeViewer)activeViewer.close();activeViewer=null;$("#screen-video").srcObject=null;$("#live-view").classList.add("hidden")});
+$("#close-screen").addEventListener("click",async()=>{if(activeViewer){activeViewer.close();activeViewer=null}$("#screen-video").srcObject=null;$("#live-view").classList.add("hidden")});
 restore();
 $("#credentials-form").addEventListener("submit",async e=>{e.preventDefault();$("#credentials-message").textContent="جارٍ التحديث…";try{const d=await api("/api/control/credentials",{method:"POST",headers:{"x-csrf-token":csrfToken},body:JSON.stringify({newUsername:$("#new-username").value,currentPassword:$("#current-password").value,newPassword:$("#new-password").value})});$("#current-password").value="";$("#new-password").value="";$("#new-username").value="";$("#credentials-message").textContent="تم تحديث بيانات الدخول. يجب استخدام البيانات الجديدة في تسجيل الدخول التالي.";await api("/api/auth/logout",{method:"POST",headers:{"x-csrf-token":csrfToken}});csrfToken="";showLogin()}catch(e){$("#credentials-message").textContent="تعذر تحديث بيانات الدخول."}});
