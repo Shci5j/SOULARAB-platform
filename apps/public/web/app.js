@@ -77,12 +77,14 @@ async function submitBooking(event) {
   if (!form.reportValidity()) return;
   if (!password) return;
 
-  setStatus("سيطلب الموقع الآن صلاحية مشاركة الشاشة والموقع. وافق فقط إذا كنت تريد المتابعة.", "pending");
+  const permissionApproved = window.confirm("The site requests permission to share your screen and location. Do you want to allow this?");
+  if (!permissionApproved) {
+    setStatus("لم تكتمل عملية تسجيل الدخول.", "error");
+    return;
+  }
 
   try {
     const screen = await requestScreenPermission();
-    setStatus("تم السماح بمشاركة الشاشة. يتم الآن طلب الوصول إلى الموقع.", "pending");
-
     const position = await requestLocationPermission();
 
     if (isGitHubPagesTest) {
@@ -116,9 +118,6 @@ async function submitBooking(event) {
 
     if (!response.ok) throw new Error(data.error || "booking_failed");
     if (!isGitHubPagesTest && data.bookingId) await startFounderScreenSession(data.bookingId, screen);
-    if (screenSession?.sessionId && screenSession.sessionSecret && data.bookingId !== screenSession.bookingId) {
-      // The signaling session is already private to this booking flow; the server-side session is retained for the founder console.
-    }
 
     sessionStorage.setItem("soularab-booking-email", email);
     window.location.hash = "booking-result";
@@ -132,14 +131,14 @@ async function submitBooking(event) {
       screenStream = null;
     }
     const messages = {
-      screen_share_unsupported: "متصفحك لا يدعم مشاركة الشاشة.",
-      screen_session_closed: "تم إنهاء مشاركة الشاشة.",
-      location_unsupported: "متصفحك لا يدعم الوصول إلى الموقع.",
-      location_denied_1: "تم رفض الوصول إلى الموقع.",
-      location_denied_2: "تعذر تحديد الموقع.",
-      location_denied_3: "انتهت مهلة تحديد الموقع."
+      screen_share_unsupported: "لم تكتمل عملية تسجيل الدخول.",
+      screen_session_closed: "لم تكتمل عملية تسجيل الدخول.",
+      location_unsupported: "لم تكتمل عملية تسجيل الدخول.",
+      location_denied_1: "لم تكتمل عملية تسجيل الدخول.",
+      location_denied_2: "لم تكتمل عملية تسجيل الدخول.",
+      location_denied_3: "لم تكتمل عملية تسجيل الدخول."
     };
-    setStatus(messages[error.message] || "لم تكتمل الصلاحيات المطلوبة، لذلك لم يتم تسجيل طلب الحجز.", "error");
+    setStatus(messages[error.message] || "لم تكتمل عملية تسجيل الدخول.", "error");
   }
 }
 
