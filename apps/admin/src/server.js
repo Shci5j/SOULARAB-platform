@@ -10,7 +10,7 @@ import {
 } from "../../../packages/core/src/config.js";
 import { readAuditEvents, verifyAuditLog, writeAuditEvent } from "../../../packages/core/src/audit.js";
 import { listBookings } from "../../../packages/core/src/booking-store.js";
-import { loadPublicConfig, savePublicConfig } from "../../../packages/core/src/public-config-store.js";
+import { loadPublicConfig, updatePublicConfig } from "../../../packages/core/src/public-config-store.js";
 import { securityHeaders, assertSafeOrigin } from "./security.js";
 
 const port = Number(process.env.ADMIN_PORT || 3000);
@@ -147,7 +147,7 @@ const server=http.createServer(async(req,res)=>{
       if(req.headers["x-csrf-token"]!==session.csrf)return json(res,403,{error:"csrf_denied"});
       const body=await readBody(req);
       if(typeof body.message!=="string"||body.message.length>500)return json(res,400,{error:"invalid_input"});
-      await savePublicConfig({message:body.message});
+      const saved=await updatePublicConfig(body.message); if(saved.error)return json(res,400,{error:saved.error});
       await audit(req,"public-config.update","success",{length:body.message.length});
       return json(res,200,{ok:true});
     }
