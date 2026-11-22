@@ -7,13 +7,13 @@ services:
     environment:
       NODE_ENV: production
       PUBLIC_PORT: 4000
-      BOOKING_STORE_FILE: /data/bookings.json
-      SCREEN_SESSION_STORE_FILE: /data/screen-sessions.json
-      PUBLIC_CONFIG_FILE: /data/public-config.json
+      BOOKING_STORE_FILE: /shared/bookings.json
+      SCREEN_SESSION_STORE_FILE: /shared/screen-sessions.json
+      PUBLIC_CONFIG_FILE: /shared/public-config.json
     ports:
       - "127.0.0.1:4000:4000"
     volumes:
-      - public-data:/data
+      - soularab-shared-data:/shared
     read_only: true
     tmpfs:
       - /tmp
@@ -44,6 +44,9 @@ services:
       ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:?Set ADMIN_SESSION_SECRET in the env file}
       AUDIT_LOG_SECRET: ${AUDIT_LOG_SECRET:?Set AUDIT_LOG_SECRET in the env file}
       ADMIN_CREDENTIALS_FILE: /data/admin-credentials.json
+      BOOKING_STORE_FILE: /shared/bookings.json
+      SCREEN_SESSION_STORE_FILE: /shared/screen-sessions.json
+      PUBLIC_CONFIG_FILE: /shared/public-config.json
       PUBLIC_API_URL: http://public:4000
       ADMIN_ALLOWED_ORIGIN: ${ADMIN_ALLOWED_ORIGIN:-http://localhost:3000}
       REQUEST_TIMEOUT_MS: ${REQUEST_TIMEOUT_MS:-10000}
@@ -53,6 +56,7 @@ services:
       - "127.0.0.1:3000:3000"
     volumes:
       - admin-data:/data
+      - soularab-shared-data:/shared
     read_only: true
     tmpfs:
       - /tmp
@@ -68,5 +72,5 @@ services:
       start_period: 10s
 
 volumes:
-  public-data:
   admin-data:
+  soularab-shared-data:
