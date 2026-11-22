@@ -7,9 +7,9 @@ services:
     environment:
       NODE_ENV: production
       PUBLIC_PORT: 4000
-      ACTIVATION_STORE_FILE: /data/activation.json
+      BOOKING_STORE_FILE: /data/bookings.json
+      SCREEN_SESSION_STORE_FILE: /data/screen-sessions.json
       PUBLIC_CONFIG_FILE: /data/public-config.json
-      SERVICE_CONTROL_TOKEN: ${SERVICE_CONTROL_TOKEN:?Set SERVICE_CONTROL_TOKEN in the env file}
     ports:
       - "127.0.0.1:4000:4000"
     volumes:
@@ -42,8 +42,8 @@ services:
       ADMIN_USERNAME: ${ADMIN_USERNAME:?Set ADMIN_USERNAME in the env file}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Set ADMIN_PASSWORD in the env file}
       ADMIN_SESSION_SECRET: ${ADMIN_SESSION_SECRET:?Set ADMIN_SESSION_SECRET in the env file}
-      SERVICE_CONTROL_TOKEN: ${SERVICE_CONTROL_TOKEN:?Set SERVICE_CONTROL_TOKEN in the env file}
       AUDIT_LOG_SECRET: ${AUDIT_LOG_SECRET:?Set AUDIT_LOG_SECRET in the env file}
+      ADMIN_CREDENTIALS_FILE: /data/admin-credentials.json
       PUBLIC_API_URL: http://public:4000
       ADMIN_ALLOWED_ORIGIN: ${ADMIN_ALLOWED_ORIGIN:-http://localhost:3000}
       REQUEST_TIMEOUT_MS: ${REQUEST_TIMEOUT_MS:-10000}

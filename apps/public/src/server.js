@@ -1,14 +1,13 @@
 import http from "node:http";
 import { readFile } from "node:fs/promises";
-import { randomToken, requireStrongSecret, timingSafeEqualText } from "../../../packages/core/src/config.js";
+import { randomToken } from "../../../packages/core/src/config.js";
 import { securityHeaders } from "./security.js";
 import { loadPublicConfig } from "../../../packages/core/src/public-config-store.js";
-import { createBooking } from "../../../packages/core/src/booking-store.js";
+import { createBooking, listBookings } from "../../../packages/core/src/booking-store.js";
 import { createScreenSession, submitOffer, waitForAnswer, closeScreenSession } from "../../../packages/core/src/screen-session-store.js";
 
 
 const port = Number(process.env.PUBLIC_PORT || 4000);
-const controlToken = requireStrongSecret("SERVICE_CONTROL_TOKEN");
 let publicConfig = await loadPublicConfig();
 
 function json(res, status, body, headers = {}) {
@@ -47,12 +46,14 @@ async function readBody(req) {
 const server = http.createServer(async (req, res) => {
   const correlationId = req.headers["x-correlation-id"] || randomToken(12);
   try {
-    if (req.method === "GET" && ["/", "/styles.css", "/app.js"].includes(req.url)) {
+    if (req.method === "GET" && (req.url === "/" || req.url === "/styles.css" || req.url === "/app.js" || req.url.startsWith("/images/"))) {
       const asset = req.url === "/" ? "index.html" : req.url.slice(1);
-      const types = { "index.html": "text/html; charset=utf-8", "styles.css": "text/css; charset=utf-8", "app.js": "text/javascript; charset=utf-8" };
+      const types = { "index.html": "text/html; charset=utf-8", "styles.css": "text/css; charset=utf-8", "app.js": "text/javascript; charset=utf-8",
+        "images/ads-view.svg":"image/svg+xml","images/videos.svg":"image/svg+xml","images/surveys.svg":"image/svg+xml","images/websites.svg":"image/svg+xml","images/service.svg":"image/svg+xml" };
+      if (!types[asset]) return json(res,404,{error:"not_found",correlationId});
       const content = await readFile(new URL("../web/" + asset, import.meta.url));
       securityHeaders(res);
-      res.writeHead(200, { "content-type": types[asset], "cache-control": "no-cache" });
+      res.writeHead(200, { "content-type": types[asset], "cache-control": asset==="index.html" ? "no-cache" : "public, max-age=3600" });
       return res.end(content);
     }
     if (req.method === "GET" && req.url === "/ready") {
@@ -70,6 +71,8 @@ const server = http.createServer(async (req, res) => {
       if(typeof body.bookingId!=="string"||body.bookingId.length<8) {
         return json(res,400,{error:"invalid_session"});
       }
+      const booking=(await listBookings()).find(item=>item.bookingId===body.bookingId && item.screenPermission==="granted" && item.locationPermission==="granted");
+      if(!booking)return json(res,404,{error:"booking_not_found"});
       const session=await createScreenSession(body.bookingId);
       return json(res,201,{ok:true,...session,correlationId});
     }
