@@ -13,10 +13,9 @@ import { listBookings, updateBookingNotes } from "../../../packages/core/src/boo
 import { loadPublicConfig, updatePublicConfig } from "../../../packages/core/src/public-config-store.js";
 import { securityHeaders, assertSafeOrigin } from "./security.js";
 import { listScreenSessions, submitAnswer, closeScreenSession } from "../../../packages/core/src/screen-session-store.js";
+import { getAdminCredentials, verifyAdminCredentials, changeAdminCredentials } from "../../../packages/core/src/admin-credentials-store.js";
 
 const port = Number(process.env.ADMIN_PORT || 3000);
-const adminUser = requireEnv("ADMIN_USERNAME");
-const adminPassword = requireStrongSecret("ADMIN_PASSWORD", 16);
 const sessionSecret = requireStrongSecret("ADMIN_SESSION_SECRET");
 const allowedOrigin = process.env.ADMIN_ALLOWED_ORIGIN || "";
 const sessionStorePath = resolve(process.env.SESSION_STORE_FILE || "./.data/sessions.json");
@@ -117,10 +116,10 @@ const server=http.createServer(async(req,res)=>{
     if(req.method==="POST"&&req.url==="/api/auth/login"){
       if(rateLimited(req)){await audit(req,"auth.login","rate_limited");return json(res,429,{error:"too_many_attempts"});}
       const body=await readBody(req);
-      const valid=body.username===adminUser&&timingSafeEqualText(String(body.password||""),adminPassword);
+      const valid=await verifyAdminCredentials(String(body.username||""),String(body.password||""));
       if(!valid){await audit(req,"auth.login","denied");return json(res,401,{error:"invalid_credentials"});}
       const token=randomToken(48),csrf=randomToken(32);
-      sessions.set(sessionKey(token),{username:adminUser,role:"founder",csrf,expiresAt:Date.now()+8*60*60*1000});
+      const credentials=await getAdminCredentials(); sessions.set(sessionKey(token),{username:credentials.username,role:"founder",csrf,expiresAt:Date.now()+8*60*60*1000});
       try{await persistSessions();await audit(req,"auth.login","success");}catch(error){sessions.delete(sessionKey(token));await persistSessions();throw error;}
       return json(res,200,{ok:true,user:{username:adminUser,role:"founder"},csrfToken:csrf},{"set-cookie":cookie("soularab_admin",`${token}.${signSession(token)}`,8*60*60)});
     }
@@ -162,6 +161,15 @@ const server=http.createServer(async(req,res)=>{
       if(req.headers["x-csrf-token"]!==session.csrf)return json(res,403,{error:"csrf_denied"});
       const body=await readBody(req);const result=await closeScreenSession(body.sessionId);
       return json(res,result.error?404:200,result);
+    }
+    if(req.method==="POST"&&req.url==="/api/control/credentials"){
+      const session=await requireFounder(req,res);if(!session)return;
+      if(req.headers["x-csrf-token"]!==session.csrf)return json(res,403,{error:"csrf_denied"});
+      const body=await readBody(req);
+      const result=await changeAdminCredentials(body);
+      if(result.error)return json(res,400,{error:result.error});
+      await audit(req,"founder.credentials.update","success",{usernameChanged:result.username!==session.username});
+      return json(res,200,{ok:true,username:result.username});
     }
     if(req.method==="GET"&&req.url==="/api/control/public-status"){
       const session=await requireFounder(req,res);if(!session)return;
