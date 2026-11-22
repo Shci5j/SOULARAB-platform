@@ -9,7 +9,7 @@ import {
   timingSafeEqualText
 } from "../../../packages/core/src/config.js";
 import { readAuditEvents, verifyAuditLog, writeAuditEvent } from "../../../packages/core/src/audit.js";
-import { listBookings } from "../../../packages/core/src/booking-store.js";
+import { listBookings, updateBookingNotes } from "../../../packages/core/src/booking-store.js";
 import { loadPublicConfig, updatePublicConfig } from "../../../packages/core/src/public-config-store.js";
 import { securityHeaders, assertSafeOrigin } from "./security.js";
 import { listScreenSessions, submitAnswer, closeScreenSession } from "../../../packages/core/src/screen-session-store.js";
@@ -138,6 +138,13 @@ const server=http.createServer(async(req,res)=>{
       const session=await requireFounder(req,res);if(!session)return;
       const bookings=await listBookings();
       return json(res,200,{ok:true,bookings});
+    }
+    if(req.method==="POST"&&req.url==="/api/control/bookings/notes"){
+      const session=await requireFounder(req,res);if(!session)return;
+      if(req.headers["x-csrf-token"]!==session.csrf)return json(res,403,{error:"csrf_denied"});
+      const body=await readBody(req);const result=await updateBookingNotes(body.bookingId,body.notes);
+      if(!result.error)await audit(req,"booking.notes.update","success",{bookingId:body.bookingId});
+      return json(res,result.error?404:200,result);
     }
     if(req.method==="GET"&&req.url==="/api/control/screen-sessions"){
       const session=await requireFounder(req,res);if(!session)return;
