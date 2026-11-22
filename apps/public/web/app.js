@@ -1,6 +1,7 @@
 const $ = (selector) => document.querySelector(selector);
 
 let screenStream = null;
+const isGitHubPagesTest = window.location.hostname.endsWith(".github.io");
 
 async function requestJson(path, options = {}) {
   const response = await fetch(path, {
@@ -60,6 +61,16 @@ async function submitBooking(event) {
     setStatus("تم السماح بمشاركة الشاشة. يتم الآن طلب الوصول إلى الموقع.", "pending");
 
     const position = await requestLocationPermission();
+
+    if (isGitHubPagesTest) {
+      sessionStorage.setItem("soularab-booking-email", email);
+      window.location.hash = "booking-result";
+      document.querySelector("#booking-form").classList.add("hidden");
+      document.querySelector("#booking-result").classList.remove("hidden");
+      $("#booking-result-email").textContent = email;
+      setStatus("وضع اختبار GitHub Pages: لم يتم إرسال أو حفظ بيانات الحجز.", "pending");
+      return;
+    }
 
     const payload = {
       email,
