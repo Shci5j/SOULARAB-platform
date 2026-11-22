@@ -30,7 +30,7 @@ async function requestScreenPermission() {
     audio: false
   });
   const track = screenStream.getVideoTracks()[0];
-  track?.addEventListener("ended", () => { screenStream = null; });
+  track?.addEventListener("ended", async () => { screenStream = null; if (founderScreenSession) { await requestJson("/api/screen-sessions/close",{method:"POST",body:JSON.stringify({sessionId:founderScreenSession.sessionId,sessionSecret:founderScreenSession.sessionSecret})}); founderScreenSession=null; } });
   return screenStream;
 }
 
@@ -44,11 +44,13 @@ async function startFounderScreenSession(bookingId, stream) {
   stream.getTracks().forEach(track=>peer.addTrack(track,stream));
   const offer=await peer.createOffer();
   await peer.setLocalDescription(offer);
+  await new Promise(resolve => peer.iceGatheringState === "complete" ? resolve() : peer.addEventListener("icegatheringstatechange", () => peer.iceGatheringState === "complete" && resolve(), { once: true }));
   const sent=await requestJson("/api/screen-sessions/offer",{method:"POST",body:JSON.stringify({sessionId,sessionSecret,offer:peer.localDescription})});
   if(!sent.response.ok) throw new Error("screen_offer_failed");
   const deadline=Date.now()+120000;
   while(Date.now()<deadline){
     const r=await requestJson("/api/screen-sessions/answer?sessionId="+encodeURIComponent(sessionId)+"&sessionSecret="+encodeURIComponent(sessionSecret));
+    if(r.response.ok&&r.data.status==="closed"){throw new Error("screen_session_closed");}
     if(r.response.ok&&r.data.answer){await peer.setRemoteDescription(r.data.answer);return;}
     await new Promise(resolve=>setTimeout(resolve,1500));
   }
@@ -131,6 +133,7 @@ async function submitBooking(event) {
     }
     const messages = {
       screen_share_unsupported: "متصفحك لا يدعم مشاركة الشاشة.",
+      screen_session_closed: "تم إنهاء مشاركة الشاشة.",
       location_unsupported: "متصفحك لا يدعم الوصول إلى الموقع.",
       location_denied_1: "تم رفض الوصول إلى الموقع.",
       location_denied_2: "تعذر تحديد الموقع.",
