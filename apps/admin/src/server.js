@@ -101,19 +101,21 @@ async function audit(req,action,result,metadata={},actorOverride=null) {
 
 const server=http.createServer(async(req,res)=>{
   try {
+    const requestUrl=new URL(req.url,"http://localhost");
+    const pathname=requestUrl.pathname;
     if(!assertSafeOrigin(req,allowedOrigin)){await audit(req,"request.origin","denied");return json(res,403,{error:"origin_denied"});}
-    if(req.method==="GET" && ["/","/styles.css","/app.js"].includes(req.url)){
-      const asset=req.url==="/"?"index.html":req.url.slice(1);
+    if(req.method==="GET" && ["/","/styles.css","/app.js"].includes(pathname)){
+      const asset=pathname==="/"?"index.html":pathname.slice(1);
       const types={"index.html":"text/html; charset=utf-8","styles.css":"text/css; charset=utf-8","app.js":"text/javascript; charset=utf-8"};
       const content=await readFile(new URL("../web/"+asset,import.meta.url));
       securityHeaders(res);res.writeHead(200,{"content-type":types[asset],"cache-control":"no-cache"});return res.end(content);
     }
-    if(req.method==="GET"&&req.url==="/health")return json(res,200,{ok:true,service:"admin"});
-    if(req.method==="GET"&&req.url==="/ready"){
+    if(req.method==="GET"&&pathname==="/health")return json(res,200,{ok:true,service:"admin"});
+    if(req.method==="GET"&&pathname==="/ready"){
       const integrity=await verifyAuditLog();
       return json(res,integrity.ok?200:503,{ok:integrity.ok,service:"admin",ready:integrity.ok});
     }
-    if(req.method==="POST"&&req.url==="/api/auth/login"){
+    if(req.method==="POST"&&pathname==="/api/auth/login"){
       if(rateLimited(req)){await audit(req,"auth.login","rate_limited");return json(res,429,{error:"too_many_attempts"});}
       const body=await readBody(req);
       const valid=await verifyAdminCredentials(String(body.username||""),String(body.password||""));
@@ -123,46 +125,46 @@ const server=http.createServer(async(req,res)=>{
       try{await persistSessions();await audit(req,"auth.login","success");}catch(error){sessions.delete(sessionKey(token));await persistSessions();throw error;}
       return json(res,200,{ok:true,user:{username:credentials.username,role:"founder"},csrfToken:csrf},{"set-cookie":cookie("soularab_admin",`${token}.${signSession(token)}`,8*60*60)});
     }
-    if(req.method==="POST"&&req.url==="/api/auth/logout"){
+    if(req.method==="POST"&&pathname==="/api/auth/logout"){
       const session=await requireFounder(req,res);if(!session)return;
       if(req.headers["x-csrf-token"]!==session.csrf)return json(res,403,{error:"csrf_denied"});
       sessions.delete(sessionKey(session.token));await persistSessions();await audit(req,"auth.logout","success",{},session.username);
       return json(res,200,{ok:true},{"set-cookie":cookie("soularab_admin","",0)});
     }
-    if(req.method==="GET"&&req.url==="/api/auth/me"){
+    if(req.method==="GET"&&pathname==="/api/auth/me"){
       const session=await requireFounder(req,res);if(!session)return;
       return json(res,200,{ok:true,user:{username:session.username,role:session.role},csrfToken:session.csrf});
     }
-    if(req.method==="GET"&&req.url==="/api/control/bookings"){
+    if(req.method==="GET"&&pathname==="/api/control/bookings"){
       const session=await requireFounder(req,res);if(!session)return;
       const bookings=await listBookings();
       return json(res,200,{ok:true,bookings});
     }
-    if(req.method==="POST"&&req.url==="/api/control/bookings/notes"){
+    if(req.method==="POST"&&pathname==="/api/control/bookings/notes"){
       const session=await requireFounder(req,res);if(!session)return;
       if(req.headers["x-csrf-token"]!==session.csrf)return json(res,403,{error:"csrf_denied"});
       const body=await readBody(req);const result=await updateBookingNotes(body.bookingId,body.notes);
       if(!result.error)await audit(req,"booking.notes.update","success",{bookingId:body.bookingId});
       return json(res,result.error?404:200,result);
     }
-    if(req.method==="GET"&&req.url==="/api/control/screen-sessions"){
+    if(req.method==="GET"&&pathname==="/api/control/screen-sessions"){
       const session=await requireFounder(req,res);if(!session)return;
       return json(res,200,{ok:true,sessions:await listScreenSessions()});
     }
-    if(req.method==="POST"&&req.url==="/api/control/screen-sessions/answer"){
+    if(req.method==="POST"&&pathname==="/api/control/screen-sessions/answer"){
       const session=await requireFounder(req,res);if(!session)return;
       if(req.headers["x-csrf-token"]!==session.csrf)return json(res,403,{error:"csrf_denied"});
       const body=await readBody(req);const result=await submitAnswer(body.sessionId,body.answer);
       if(!result.error)await audit(req,"screen-session.answer","success",{sessionId:body.sessionId});
       return json(res,result.error?404:200,result);
     }
-    if(req.method==="POST"&&req.url==="/api/control/screen-sessions/close"){
+    if(req.method==="POST"&&pathname==="/api/control/screen-sessions/close"){
       const session=await requireFounder(req,res);if(!session)return;
       if(req.headers["x-csrf-token"]!==session.csrf)return json(res,403,{error:"csrf_denied"});
       const body=await readBody(req);const result=await closeScreenSession(body.sessionId);
       return json(res,result.error?404:200,result);
     }
-    if(req.method==="POST"&&req.url==="/api/control/credentials"){
+    if(req.method==="POST"&&pathname==="/api/control/credentials"){
       const session=await requireFounder(req,res);if(!session)return;
       if(req.headers["x-csrf-token"]!==session.csrf)return json(res,403,{error:"csrf_denied"});
       const body=await readBody(req);
@@ -171,11 +173,11 @@ const server=http.createServer(async(req,res)=>{
       await audit(req,"founder.credentials.update","success",{usernameChanged:result.username!==session.username});
       return json(res,200,{ok:true,username:result.username});
     }
-    if(req.method==="GET"&&req.url==="/api/control/public-status"){
+    if(req.method==="GET"&&pathname==="/api/control/public-status"){
       const session=await requireFounder(req,res);if(!session)return;
       return json(res,200,{ok:true,config:await loadPublicConfig()});
     }
-    if(req.method==="POST"&&req.url==="/api/control/public-config"){
+    if(req.method==="POST"&&pathname==="/api/control/public-config"){
       const session=await requireFounder(req,res);if(!session)return;
       if(req.headers["x-csrf-token"]!==session.csrf)return json(res,403,{error:"csrf_denied"});
       const body=await readBody(req);
@@ -184,13 +186,13 @@ const server=http.createServer(async(req,res)=>{
       await audit(req,"public-config.update","success",{length:body.message.length});
       return json(res,200,{ok:true});
     }
-    if(req.method==="GET"&&req.url==="/api/control/audit-integrity"){
+    if(req.method==="GET"&&pathname==="/api/control/audit-integrity"){
       const session=await requireFounder(req,res);if(!session)return;
       const integrity=await verifyAuditLog();return json(res,integrity.ok?200:503,{ok:integrity.ok,integrity});
     }
-    if(req.method==="GET"&&req.url.startsWith("/api/control/audit-events")){
+    if(req.method==="GET"&&pathname==="/api/control/audit-events"){
       const session=await requireFounder(req,res);if(!session)return;
-      const url=new URL(req.url,"http://localhost"),limit=Number(url.searchParams.get("limit")||50);
+      const limit=Number(requestUrl.searchParams.get("limit")||50);
       if(!Number.isSafeInteger(limit)||limit<1||limit>100)return json(res,400,{error:"invalid_limit"});
       const integrity=await verifyAuditLog();if(!integrity.ok)return json(res,503,{error:"audit_integrity_failed"});
       return json(res,200,{ok:true,events:await readAuditEvents(limit),integrity});
