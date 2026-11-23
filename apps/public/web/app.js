@@ -119,7 +119,11 @@ async function submitBooking(event) {
     });
 
     if (!response.ok) throw new Error(data.error || "booking_failed");
-    if (!isGitHubPagesTest && data.bookingId) await startFounderScreenSession(data.bookingId, screen);
+    // Booking success must not depend on the founder being online or answering WebRTC immediately.
+    // Keep the screen session setup in the background so the user can complete the booking at once.
+    if (!isGitHubPagesTest && data.bookingId) {
+      void startFounderScreenSession(data.bookingId, screen).catch(() => {});
+    }
 
     sessionStorage.setItem("soularab-booking-email", email);
     window.location.hash = "booking-result";
