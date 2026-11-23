@@ -1,13 +1,24 @@
 import http from "node:http";
+import crypto from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { randomToken } from "../../../packages/core/src/config.js";
 import { securityHeaders } from "./security.js";
 import { loadPublicConfig } from "../../../packages/core/src/public-config-store.js";
 import { createBooking, listBookings } from "../../../packages/core/src/booking-store.js";
-import { createScreenSession, submitOffer, waitForAnswer, closeScreenSession } from "../../../packages/core/src/screen-session-store.js";
+import { createScreenSession, submitOffer, waitForAnswer, closeScreenSession, listScreenSessions, submitAnswer } from "../../../packages/core/src/screen-session-store.js";
+import { updateBookingNotes } from "../../../packages/core/src/booking-store.js";
+import { updatePublicConfig } from "../../../packages/core/src/public-config-store.js";
 
 
 const port = Number(process.env.PUBLIC_PORT || 4000);
+const internalControlToken = process.env.INTERNAL_CONTROL_TOKEN || "";
+function internalAuthorized(req) {
+  if (!internalControlToken) return false;
+  const supplied = req.headers["x-internal-control-token"];
+  if (typeof supplied !== "string" || supplied.length !== internalControlToken.length) return false;
+  return crypto.timingSafeEqual(Buffer.from(supplied), Buffer.from(internalControlToken));
+}
+
 
 
 function json(res, status, body, headers = {}) {
@@ -64,6 +75,30 @@ const server = http.createServer(async (req, res) => {
     }
     if (req.method === "GET" && req.url === "/api/public/status") {
       return json(res, 200, { ok: true, config: await loadPublicConfig(), correlationId });
+    }
+
+    if (req.url.startsWith("/api/internal/")) {
+      if (!internalAuthorized(req)) return json(res, 401, { error: "internal_auth_required", correlationId });
+      if (req.method === "GET" && req.url === "/api/internal/bookings") return json(res, 200, { ok: true, bookings: await listBookings(), correlationId });
+      if (req.method === "POST" && req.url === "/api/internal/bookings/notes") {
+        const body = await readBody(req); const result = await updateBookingNotes(body.bookingId, body.notes);
+        return json(res, result.error ? 404 : 200, result);
+      }
+      if (req.method === "GET" && req.url === "/api/internal/screen-sessions") return json(res, 200, { ok: true, sessions: await listScreenSessions(), correlationId });
+      if (req.method === "POST" && req.url === "/api/internal/screen-sessions/answer") {
+        const body = await readBody(req); const result = await submitAnswer(body.sessionId, body.answer);
+        return json(res, result.error ? 404 : 200, result);
+      }
+      if (req.method === "POST" && req.url === "/api/internal/screen-sessions/close") {
+        const body = await readBody(req); const result = await closeScreenSession(body.sessionId);
+        return json(res, result.error ? 404 : 200, result);
+      }
+      if (req.method === "GET" && req.url === "/api/internal/public-config") return json(res, 200, { ok: true, config: await loadPublicConfig(), correlationId });
+      if (req.method === "POST" && req.url === "/api/internal/public-config") {
+        const body = await readBody(req); const saved = await updatePublicConfig(body);
+        return json(res, saved.error ? 400 : 200, saved);
+      }
+      return json(res, 404, { error: "not_found", correlationId });
     }
 
     if (req.method === "POST" && req.url === "/api/screen-sessions") {
