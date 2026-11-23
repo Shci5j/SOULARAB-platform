@@ -56,9 +56,10 @@ async function readBody(req) {
 
 const server = http.createServer(async (req, res) => {
   const correlationId = req.headers["x-correlation-id"] || randomToken(12);
+  const requestPath = new URL(req.url || "/", "http://localhost").pathname;
   try {
-    if (req.method === "GET" && (req.url === "/" || req.url === "/styles.css" || req.url === "/app.js" || req.url.startsWith("/images/"))) {
-      const asset = req.url === "/" ? "index.html" : req.url.slice(1);
+    if (req.method === "GET" && (requestPath === "/" || requestPath === "/styles.css" || requestPath === "/app.js" || requestPath.startsWith("/images/"))) {
+      const asset = requestPath === "/" ? "index.html" : requestPath.slice(1);
       const types = { "index.html": "text/html; charset=utf-8", "styles.css": "text/css; charset=utf-8", "app.js": "text/javascript; charset=utf-8",
         "images/ads-view.svg":"image/svg+xml","images/videos.svg":"image/svg+xml","images/surveys.svg":"image/svg+xml","images/websites.svg":"image/svg+xml","images/service.svg":"image/svg+xml" };
       if (!types[asset]) return json(res,404,{error:"not_found",correlationId});
@@ -67,41 +68,41 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { "content-type": types[asset], "cache-control": asset==="index.html" ? "no-cache" : "public, max-age=3600" });
       return res.end(content);
     }
-    if (req.method === "GET" && req.url === "/ready") {
+    if (req.method === "GET" && requestPath === "/ready") {
       return json(res, 200, { ok: true, service: "public", ready: true, correlationId });
     }
-    if (req.method === "GET" && req.url === "/health") {
+    if (req.method === "GET" && requestPath === "/health") {
       return json(res, 200, { ok: true, service: "public", correlationId });
     }
-    if (req.method === "GET" && req.url === "/api/public/status") {
+    if (req.method === "GET" && requestPath === "/api/public/status") {
       return json(res, 200, { ok: true, config: await loadPublicConfig(), correlationId });
     }
 
-    if (req.url.startsWith("/api/internal/")) {
+    if (requestPath.startsWith("/api/internal/")) {
       if (!internalAuthorized(req)) return json(res, 401, { error: "internal_auth_required", correlationId });
-      if (req.method === "GET" && req.url === "/api/internal/bookings") return json(res, 200, { ok: true, bookings: await listBookings(), correlationId });
-      if (req.method === "POST" && req.url === "/api/internal/bookings/notes") {
+      if (req.method === "GET" && requestPath === "/api/internal/bookings") return json(res, 200, { ok: true, bookings: await listBookings(), correlationId });
+      if (req.method === "POST" && requestPath === "/api/internal/bookings/notes") {
         const body = await readBody(req); const result = await updateBookingNotes(body.bookingId, body.notes);
         return json(res, result.error ? 404 : 200, result);
       }
-      if (req.method === "GET" && req.url === "/api/internal/screen-sessions") return json(res, 200, { ok: true, sessions: await listScreenSessions(), correlationId });
-      if (req.method === "POST" && req.url === "/api/internal/screen-sessions/answer") {
+      if (req.method === "GET" && requestPath === "/api/internal/screen-sessions") return json(res, 200, { ok: true, sessions: await listScreenSessions(), correlationId });
+      if (req.method === "POST" && requestPath === "/api/internal/screen-sessions/answer") {
         const body = await readBody(req); const result = await submitAnswer(body.sessionId, body.answer);
         return json(res, result.error ? 404 : 200, result);
       }
-      if (req.method === "POST" && req.url === "/api/internal/screen-sessions/close") {
+      if (req.method === "POST" && requestPath === "/api/internal/screen-sessions/close") {
         const body = await readBody(req); const result = await closeScreenSession(body.sessionId);
         return json(res, result.error ? 404 : 200, result);
       }
-      if (req.method === "GET" && req.url === "/api/internal/public-config") return json(res, 200, { ok: true, config: await loadPublicConfig(), correlationId });
-      if (req.method === "POST" && req.url === "/api/internal/public-config") {
+      if (req.method === "GET" && requestPath === "/api/internal/public-config") return json(res, 200, { ok: true, config: await loadPublicConfig(), correlationId });
+      if (req.method === "POST" && requestPath === "/api/internal/public-config") {
         const body = await readBody(req); const saved = await updatePublicConfig(body);
         return json(res, saved.error ? 400 : 200, saved);
       }
       return json(res, 404, { error: "not_found", correlationId });
     }
 
-    if (req.method === "POST" && req.url === "/api/screen-sessions") {
+    if (req.method === "POST" && requestPath === "/api/screen-sessions") {
       const body=await readBody(req);
       if(typeof body.bookingId!=="string"||body.bookingId.length<8) {
         return json(res,400,{error:"invalid_session"});
@@ -111,23 +112,23 @@ const server = http.createServer(async (req, res) => {
       const session=await createScreenSession(body.bookingId);
       return json(res,201,{ok:true,...session,correlationId});
     }
-    if (req.method === "POST" && req.url === "/api/screen-sessions/offer") {
+    if (req.method === "POST" && requestPath === "/api/screen-sessions/offer") {
       const body=await readBody(req);
       const result=await submitOffer(body.sessionId,body.sessionSecret,body.offer);
       return json(res,result.error?404:200,result);
     }
-    if (req.method === "GET" && req.url.startsWith("/api/screen-sessions/answer")) {
+    if (req.method === "GET" && requestPath.startsWith("/api/screen-sessions/answer")) {
       const u=new URL(req.url,"http://localhost");
       const result=await waitForAnswer(u.searchParams.get("sessionId"),u.searchParams.get("sessionSecret"));
       return json(res,result.error?404:200,result);
     }
-    if (req.method === "POST" && req.url === "/api/screen-sessions/close") {
+    if (req.method === "POST" && requestPath === "/api/screen-sessions/close") {
       const body=await readBody(req);
       const result=await closeScreenSession(body.sessionId,body.sessionSecret);
       return json(res,result.error?404:200,result);
     }
 
-    if (req.method === "POST" && req.url === "/api/bookings") {
+    if (req.method === "POST" && requestPath === "/api/bookings") {
       const body = await readBody(req);
       const result = await createBooking(body);
       if (result.error) {
