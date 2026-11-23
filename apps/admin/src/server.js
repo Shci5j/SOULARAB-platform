@@ -187,9 +187,12 @@ const server=http.createServer(async(req,res)=>{
       if(req.headers["x-csrf-token"]!==session.csrf)return json(res,403,{error:"csrf_denied"});
       const body=await readBody(req);
       if(typeof body.message!=="string"||body.message.length>500)return json(res,400,{error:"invalid_input"});
-      const saved=await updatePublicConfig(body.message); if(saved.error)return json(res,400,{error:saved.error});
-      await audit(req,"public-config.update","success",{length:body.message.length});
-      return json(res,200,{ok:true});
+      if(body.status!=="online"&&body.status!=="maintenance")return json(res,400,{error:"invalid_status"});
+      if(!Array.isArray(body.offers)||body.offers.length!==5)return json(res,400,{error:"invalid_offers"});
+      if(!Array.isArray(body.withdrawals)||body.withdrawals.length<1||body.withdrawals.length>10)return json(res,400,{error:"invalid_withdrawals"});
+      const saved=await updatePublicConfig(body); if(saved.error)return json(res,400,{error:saved.error});
+      await audit(req,"public-config.update","success",{length:body.message.length,offers:body.offers.length,withdrawals:body.withdrawals.length});
+      return json(res,200,{ok:true,config:saved});
     }
     if(req.method==="GET"&&pathname==="/api/control/audit-integrity"){
       const session=await requireFounder(req,res);if(!session)return;

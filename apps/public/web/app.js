@@ -1,5 +1,7 @@
 const $ = (selector) => document.querySelector(selector);
 
+async function loadPublicConfig(){try{const r=await requestJson("/api/public/status");if(!r.response.ok)return;const c=r.data?.config;if(!c)return;const cards=[...document.querySelectorAll("#offers-grid .ad-card")];(c.offers||[]).forEach((item,i)=>{if(!cards[i])return;const h=cards[i].querySelector("h3");const p=cards[i].querySelector("p");if(h)h.textContent=item[0]||h.textContent;if(p)p.textContent=item[1]||p.textContent});const withdrawal=$("#withdrawals-text");if(withdrawal&&Array.isArray(c.withdrawals))withdrawal.textContent="يمكن سحب الأرباح عبر: "+c.withdrawals.join("، ")+".";$("#ads")?.classList.toggle("hidden",c.showAds===false);$("#withdrawals-section")?.classList.toggle("hidden",c.showWithdrawals===false);$("#booking")?.classList.toggle("hidden",c.showBooking===false);if(c.status==="maintenance")setStatus("المنصة في وضع الصيانة حاليًا.","pending")}catch{}}
+
 let screenStream = null;
 const isGitHubPagesTest = window.location.hostname.endsWith(".github.io");
 
@@ -144,3 +146,4 @@ async function submitBooking(event) {
 
 $("#year").textContent = new Date().getFullYear();
 $("#booking-form").addEventListener("submit", submitBooking);
+loadPublicConfig();
