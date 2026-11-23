@@ -31,6 +31,6 @@ jobs:
           path: apps/public/web
       - name: Deploy
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: actions/deploy-pages@v5
         with:
           artifact_name: soularab-pages-${{ github.run_id }}-${{ github.run_attempt }}
