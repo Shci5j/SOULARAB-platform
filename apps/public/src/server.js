@@ -10,7 +10,7 @@ import { updateBookingNotes } from "../../../packages/core/src/booking-store.js"
 import { updatePublicConfig } from "../../../packages/core/src/public-config-store.js";
 
 
-const port = Number(process.env.PUBLIC_PORT || 4000);
+const port = Number(process.env.PORT || process.env.PUBLIC_PORT || 4000);
 const internalControlToken = process.env.INTERNAL_CONTROL_TOKEN || "";
 function internalAuthorized(req) {
   if (!internalControlToken) return false;
