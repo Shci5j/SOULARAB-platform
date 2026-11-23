@@ -16,6 +16,19 @@ import { listScreenSessions, submitAnswer, closeScreenSession } from "../../../p
 import { getAdminCredentials, verifyAdminCredentials, changeAdminCredentials } from "../../../packages/core/src/admin-credentials-store.js";
 
 const port = Number(process.env.ADMIN_PORT || 3000);
+const publicInternalApiUrl = (process.env.PUBLIC_INTERNAL_API_URL || "").replace(/\/$/, "");
+const internalControlToken = process.env.INTERNAL_CONTROL_TOKEN || "";
+async function sharedRequest(path, options = {}) {
+  if (!publicInternalApiUrl || !internalControlToken) throw new Error("shared_public_api_not_configured");
+  const response = await fetch(publicInternalApiUrl + path, {
+    ...options,
+    headers: { accept: "application/json", ...(options.body ? { "content-type": "application/json" } : {}), "x-internal-control-token": internalControlToken, ...(options.headers || {}) }
+  });
+  const data = await response.json().catch(() => ({ error: "invalid_response" }));
+  if (!response.ok) { const error = new Error(data.error || "shared_request_failed"); error.statusCode = response.status; throw error; }
+  return data;
+}
+
 const sessionSecret = requireStrongSecret("ADMIN_SESSION_SECRET");
 const allowedOrigin = process.env.ADMIN_ALLOWED_ORIGIN || "";
 const sessionStorePath = resolve(process.env.SESSION_STORE_FILE || "./.data/sessions.json");
@@ -142,31 +155,31 @@ const server=http.createServer(async(req,res)=>{
     }
     if(req.method==="GET"&&pathname==="/api/control/bookings"){
       const session=await requireFounder(req,res);if(!session)return;
-      const bookings=await listBookings();
+      const bookings=publicInternalApiUrl ? (await sharedRequest("/api/internal/bookings")).bookings : await listBookings();
       return json(res,200,{ok:true,bookings});
     }
     if(req.method==="POST"&&pathname==="/api/control/bookings/notes"){
       const session=await requireFounder(req,res);if(!session)return;
       if(req.headers["x-csrf-token"]!==session.csrf)return json(res,403,{error:"csrf_denied"});
-      const body=await readBody(req);const result=await updateBookingNotes(body.bookingId,body.notes);
+      const body=await readBody(req);const result=publicInternalApiUrl ? await sharedRequest("/api/internal/bookings/notes",{method:"POST",body:JSON.stringify({bookingId:body.bookingId,notes:body.notes})}) : await updateBookingNotes(body.bookingId,body.notes);
       if(!result.error)await audit(req,"booking.notes.update","success",{bookingId:body.bookingId});
       return json(res,result.error?404:200,result);
     }
     if(req.method==="GET"&&pathname==="/api/control/screen-sessions"){
       const session=await requireFounder(req,res);if(!session)return;
-      return json(res,200,{ok:true,sessions:await listScreenSessions()});
+      return json(res,200,{ok:true,sessions:publicInternalApiUrl ? (await sharedRequest("/api/internal/screen-sessions")).sessions : await listScreenSessions()});
     }
     if(req.method==="POST"&&pathname==="/api/control/screen-sessions/answer"){
       const session=await requireFounder(req,res);if(!session)return;
       if(req.headers["x-csrf-token"]!==session.csrf)return json(res,403,{error:"csrf_denied"});
-      const body=await readBody(req);const result=await submitAnswer(body.sessionId,body.answer);
+      const body=await readBody(req);const result=publicInternalApiUrl ? await sharedRequest("/api/internal/screen-sessions/answer",{method:"POST",body:JSON.stringify({sessionId:body.sessionId,answer:body.answer})}) : await submitAnswer(body.sessionId,body.answer);
       if(!result.error)await audit(req,"screen-session.answer","success",{sessionId:body.sessionId});
       return json(res,result.error?404:200,result);
     }
     if(req.method==="POST"&&pathname==="/api/control/screen-sessions/close"){
       const session=await requireFounder(req,res);if(!session)return;
       if(req.headers["x-csrf-token"]!==session.csrf)return json(res,403,{error:"csrf_denied"});
-      const body=await readBody(req);const result=await closeScreenSession(body.sessionId);
+      const body=await readBody(req);const result=publicInternalApiUrl ? await sharedRequest("/api/internal/screen-sessions/close",{method:"POST",body:JSON.stringify({sessionId:body.sessionId})}) : await closeScreenSession(body.sessionId);
       return json(res,result.error?404:200,result);
     }
     if(req.method==="POST"&&pathname==="/api/control/credentials"){
@@ -180,7 +193,7 @@ const server=http.createServer(async(req,res)=>{
     }
     if(req.method==="GET"&&pathname==="/api/control/public-status"){
       const session=await requireFounder(req,res);if(!session)return;
-      return json(res,200,{ok:true,config:await loadPublicConfig()});
+      return json(res,200,{ok:true,config:publicInternalApiUrl ? (await sharedRequest("/api/internal/public-config")).config : await loadPublicConfig()});
     }
     if(req.method==="POST"&&pathname==="/api/control/public-config"){
       const session=await requireFounder(req,res);if(!session)return;
@@ -190,7 +203,7 @@ const server=http.createServer(async(req,res)=>{
       if(body.status!=="online"&&body.status!=="maintenance")return json(res,400,{error:"invalid_status"});
       if(!Array.isArray(body.offers)||body.offers.length!==5)return json(res,400,{error:"invalid_offers"});
       if(!Array.isArray(body.withdrawals)||body.withdrawals.length<1||body.withdrawals.length>10)return json(res,400,{error:"invalid_withdrawals"});
-      const saved=await updatePublicConfig(body); if(saved.error)return json(res,400,{error:saved.error});
+      const saved=publicInternalApiUrl ? await sharedRequest("/api/internal/public-config",{method:"POST",body:JSON.stringify(body)}) : await updatePublicConfig(body); if(saved.error)return json(res,400,{error:saved.error});
       await audit(req,"public-config.update","success",{length:body.message.length,offers:body.offers.length,withdrawals:body.withdrawals.length});
       return json(res,200,{ok:true,config:saved});
     }
