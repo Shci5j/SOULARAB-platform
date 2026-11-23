@@ -118,12 +118,17 @@ const server=http.createServer(async(req,res)=>{
     if(req.method==="POST"&&pathname==="/api/auth/login"){
       if(rateLimited(req)){await audit(req,"auth.login","rate_limited");return json(res,429,{error:"too_many_attempts"});}
       const body=await readBody(req);
-      const valid=await verifyAdminCredentials(String(body.username||""),String(body.password||""));
-      if(!valid){await audit(req,"auth.login","denied");return json(res,401,{error:"invalid_credentials"});}
-      const token=randomToken(48),csrf=randomToken(32);
-      const credentials=await getAdminCredentials(); sessions.set(sessionKey(token),{username:credentials.username,role:"founder",csrf,expiresAt:Date.now()+8*60*60*1000});
-      try{await persistSessions();await audit(req,"auth.login","success");}catch(error){sessions.delete(sessionKey(token));await persistSessions();throw error;}
-      return json(res,200,{ok:true,user:{username:credentials.username,role:"founder"},csrfToken:csrf},{"set-cookie":cookie("soularab_admin",`${token}.${signSession(token)}`,8*60*60)});
+      try {
+        const valid=await verifyAdminCredentials(String(body.username||""),String(body.password||""));
+        if(!valid){await audit(req,"auth.login","denied");return json(res,401,{error:"invalid_credentials"});}
+        const token=randomToken(48),csrf=randomToken(32);
+        const credentials=await getAdminCredentials(); sessions.set(sessionKey(token),{username:credentials.username,role:"founder",csrf,expiresAt:Date.now()+8*60*60*1000});
+        try{await persistSessions();await audit(req,"auth.login","success");}catch(error){sessions.delete(sessionKey(token));try{await persistSessions();}catch{};console.error("founder login post-auth failure:",error.message);throw error;}
+        return json(res,200,{ok:true,user:{username:credentials.username,role:"founder"},csrfToken:csrf},{"set-cookie":cookie("soularab_admin",token+"."+signSession(token),8*60*60)});
+      } catch(error) {
+        if(error.message!=="invalid_credentials") console.error("founder login failure:",error.message);
+        throw error;
+      }
     }
     if(req.method==="POST"&&pathname==="/api/auth/logout"){
       const session=await requireFounder(req,res);if(!session)return;
