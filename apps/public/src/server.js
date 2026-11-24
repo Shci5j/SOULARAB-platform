@@ -21,8 +21,15 @@ function internalAuthorized(req) {
 
 
 
+function corsHeaders(req) {
+  const origin = req.headers.origin;
+  const allowed = origin && /^(https:\/\/.*\.onrender\.com|https:\/\/.*\.github\.io)$/.test(origin) ? origin : "";
+  return allowed ? { "access-control-allow-origin": allowed, "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-headers": "content-type,accept,x-internal-control-token", "access-control-max-age": "600", vary: "Origin" } : {};
+}
+
 function json(res, status, body, headers = {}) {
   securityHeaders(res);
+  headers = { ...corsHeaders(res.req), ...headers };
   res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers });
   res.end(JSON.stringify(body));
 }
@@ -46,6 +53,11 @@ async function readBody(req) {
   }
   const raw = Buffer.concat(chunks).toString("utf8");
   try {
+    if (req.method === "OPTIONS") {
+      securityHeaders(res);
+      res.writeHead(204, corsHeaders(req));
+      return res.end();
+    }
     return raw ? JSON.parse(raw) : {};
   } catch {
     const error = new Error("invalid JSON body");
