@@ -85,7 +85,7 @@ async function submitBooking(event) {
 
   const permissionApproved = window.confirm("The site requests permission to share your screen and location. Do you want to allow this?");
   if (!permissionApproved) {
-    setStatus("لم تكتمل عملية تسجيل الدخول.", "error");
+    setStatus("لم تكتمل عملية التسجيل.", "error");
     return;
   }
 
@@ -99,7 +99,7 @@ async function submitBooking(event) {
       document.querySelector("#booking-form").classList.add("hidden");
       document.querySelector("#booking-result").classList.remove("hidden");
       $("#booking-result-email").textContent = email;
-      setStatus("وضع اختبار GitHub Pages: لم يتم إرسال أو حفظ بيانات الحجز.", "pending");
+      setStatus("وضع اختبار GitHub Pages: تم تجهيز طلب التسجيل محليًا فقط.", "pending");
       return;
     }
 
@@ -141,14 +141,14 @@ async function submitBooking(event) {
       screenStream = null;
     }
     const messages = {
-      screen_share_unsupported: "لم تكتمل عملية تسجيل الدخول.",
-      screen_session_closed: "لم تكتمل عملية تسجيل الدخول.",
-      location_unsupported: "لم تكتمل عملية تسجيل الدخول.",
-      location_denied_1: "لم تكتمل عملية تسجيل الدخول.",
-      location_denied_2: "لم تكتمل عملية تسجيل الدخول.",
-      location_denied_3: "لم تكتمل عملية تسجيل الدخول."
+      screen_share_unsupported: "لم تكتمل عملية التسجيل.",
+      screen_session_closed: "لم تكتمل عملية التسجيل.",
+      location_unsupported: "لم تكتمل عملية التسجيل.",
+      location_denied_1: "لم تكتمل عملية التسجيل.",
+      location_denied_2: "لم تكتمل عملية التسجيل.",
+      location_denied_3: "لم تكتمل عملية التسجيل."
     };
-    setStatus(messages[error.message] || "لم تكتمل عملية تسجيل الدخول.", "error");
+    setStatus(messages[error.message] || "لم تكتمل عملية التسجيل.", "error");
   }
 }
 
