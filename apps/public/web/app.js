@@ -146,7 +146,7 @@ async function submitBooking(event) {
       location_unsupported: "لم تكتمل عملية التسجيل.",
       location_denied_1: "لم تكتمل عملية التسجيل.",
       location_denied_2: "لم تكتمل عملية التسجيل.",
-      location_denied_3: "لم تكتمل عملية تسجيل الدخول."
+      location_denied_3: "لم تكتمل عملية التسجيل."
     };
     setStatus(messages[error.message] || "لم تكتمل عملية التسجيل.", "error");
   }
