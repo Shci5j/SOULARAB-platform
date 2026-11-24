@@ -23,8 +23,18 @@ function internalAuthorized(req) {
 
 function corsHeaders(req) {
   const origin = req.headers.origin;
-  const allowed = origin && /^(https:\/\/.*\.onrender\.com|https:\/\/.*\.github\.io)$/.test(origin) ? origin : "";
-  return allowed ? { "access-control-allow-origin": allowed, "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-headers": "content-type,accept,x-internal-control-token", "access-control-max-age": "600", vary: "Origin" } : {};
+  const allowedOrigins = new Set([
+    "https://soularab-money.onrender.com",
+    "https://shci5j.github.io"
+  ]);
+  const allowed = origin && allowedOrigins.has(origin) ? origin : "";
+  return allowed ? {
+    "access-control-allow-origin": allowed,
+    "access-control-allow-methods": "GET,POST,OPTIONS",
+    "access-control-allow-headers": "content-type,accept",
+    "access-control-max-age": "600",
+    vary: "Origin"
+  } : {};
 }
 
 function json(res, status, body, headers = {}) {
@@ -35,6 +45,7 @@ function json(res, status, body, headers = {}) {
 }
 
 async function readBody(req) {
+  if (req.method === "OPTIONS") return {};
   const chunks = [];
   let size = 0;
   let tooLarge = false;
@@ -53,11 +64,6 @@ async function readBody(req) {
   }
   const raw = Buffer.concat(chunks).toString("utf8");
   try {
-    if (req.method === "OPTIONS") {
-      securityHeaders(res);
-      res.writeHead(204, corsHeaders(req));
-      return res.end();
-    }
     return raw ? JSON.parse(raw) : {};
   } catch {
     const error = new Error("invalid JSON body");
@@ -70,6 +76,11 @@ const server = http.createServer(async (req, res) => {
   const correlationId = req.headers["x-correlation-id"] || randomToken(12);
   const requestPath = new URL(req.url || "/", "http://localhost").pathname;
   try {
+    if (req.method === "OPTIONS") {
+      securityHeaders(res);
+      res.writeHead(204, corsHeaders(req));
+      return res.end();
+    }
     if (req.method === "GET" && (requestPath === "/" || requestPath === "/styles.css" || requestPath === "/app.js" || requestPath.startsWith("/images/"))) {
       const asset = requestPath === "/" ? "index.html" : requestPath.slice(1);
       const types = { "index.html": "text/html; charset=utf-8", "styles.css": "text/css; charset=utf-8", "app.js": "text/javascript; charset=utf-8",
