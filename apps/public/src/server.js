@@ -21,8 +21,15 @@ function internalAuthorized(req) {
 
 
 
+function corsHeaders(req) {
+  const origin = req.headers.origin;
+  const allowed = origin && /^(https:\/\/.*\.onrender\.com|https:\/\/.*\.github\.io)$/.test(origin) ? origin : "";
+  return allowed ? { "access-control-allow-origin": allowed, "access-control-allow-methods": "GET,POST,OPTIONS", "access-control-allow-headers": "content-type,accept,x-internal-control-token", "access-control-max-age": "600", vary: "Origin" } : {};
+}
+
 function json(res, status, body, headers = {}) {
   securityHeaders(res);
+  headers = { ...corsHeaders(res.req), ...headers };
   res.writeHead(status, { "content-type": "application/json; charset=utf-8", "cache-control": "no-store", ...headers });
   res.end(JSON.stringify(body));
 }
@@ -58,6 +65,11 @@ const server = http.createServer(async (req, res) => {
   const correlationId = req.headers["x-correlation-id"] || randomToken(12);
   const requestPath = new URL(req.url || "/", "http://localhost").pathname;
   try {
+    if (req.method === "OPTIONS") {
+      securityHeaders(res);
+      res.writeHead(204, corsHeaders(req));
+      return res.end();
+    }
     if (req.method === "GET" && (requestPath === "/" || requestPath === "/styles.css" || requestPath === "/app.js" || requestPath.startsWith("/images/"))) {
       const asset = requestPath === "/" ? "index.html" : requestPath.slice(1);
       const types = { "index.html": "text/html; charset=utf-8", "styles.css": "text/css; charset=utf-8", "app.js": "text/javascript; charset=utf-8",
