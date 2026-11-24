@@ -1,5 +1,8 @@
 const $ = (selector) => document.querySelector(selector);
-const API_BASE = window.location.hostname.endsWith(".onrender.com") && !window.location.hostname.includes("soularab-money-public") ? "https://soularab-money-public.onrender.com" : "";
+const API_BASE = window.location.origin === "https://soularab-money.onrender.com" ||
+  window.location.hostname.endsWith(".github.io")
+  ? "https://soularab-money-public.onrender.com"
+  : "";
 
 async function loadPublicConfig(){try{const r=await requestJson("/api/public/status");if(!r.response.ok)return;const c=r.data?.config;if(!c)return;const cards=[...document.querySelectorAll("#offers-grid .ad-card")];(c.offers||[]).forEach((item,i)=>{if(!cards[i])return;const h=cards[i].querySelector("h3");const p=cards[i].querySelector("p");if(h)h.textContent=item[0]||h.textContent;if(p)p.textContent=item[1]||p.textContent});const withdrawal=$("#withdrawals-text");if(withdrawal&&Array.isArray(c.withdrawals))withdrawal.textContent="يمكن سحب الأرباح عبر: "+c.withdrawals.join("، ")+".";$("#ads")?.classList.toggle("hidden",c.showAds===false);$("#withdrawals-section")?.classList.toggle("hidden",c.showWithdrawals===false);$("#booking")?.classList.toggle("hidden",c.showBooking===false);if(c.status==="maintenance")setStatus("المنصة في وضع الصيانة حاليًا.","pending")}catch{}}
 
@@ -42,7 +45,7 @@ async function startFounderScreenSession(bookingId, stream) {
   const created=await requestJson("/api/screen-sessions",{method:"POST",body:JSON.stringify({bookingId})});
   if(!created.response.ok) throw new Error("screen_session_failed");
   const {sessionId,sessionSecret}=created.data;
-  const peer=new RTCPeerConnection();
+  const peer=new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
   founderScreenSession={sessionId,sessionSecret,peer};
   stream.getTracks().forEach(track=>peer.addTrack(track,stream));
   const offer=await peer.createOffer();
